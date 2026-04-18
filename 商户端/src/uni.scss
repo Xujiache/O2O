@@ -1,0 +1,52 @@
+/**
+ * uni-app 全局样式变量
+ * 商户端主色：蓝色（对应后台/工具类应用视觉）
+ * 仅 P1 占位，P6 阶段按设计稿扩展
+ */
+
+@import 'uview-plus/theme';
+
+$uni-color-primary: #2d8cf0;
+$uni-color-success: #67c23a;
+$uni-color-warning: #e6a23c;
+$uni-color-error: #f56c6c;
+
+$uni-text-color: #333;
+$uni-text-color-inverse: #fff;
+$uni-text-color-grey: #999;
+$uni-text-color-placeholder: #808080;
+$uni-text-color-disable: #c0c4cc;
+
+$uni-bg-color: #fff;
+$uni-bg-color-grey: #f5f6f8;
+$uni-bg-color-hover: #f1f1f1;
+$uni-bg-color-mask: rgb(0 0 0 / 40%);
+
+$uni-border-color: #e5e5e5;
+
+$uni-size-grid: 4px;
+$uni-font-size-sm: 12px;
+$uni-font-size-base: 14px;
+$uni-font-size-lg: 16px;
+
+$uni-img-size-sm: 20px;
+$uni-img-size-base: 26px;
+$uni-img-size-lg: 40px;
+
+$uni-border-radius-sm: 2px;
+$uni-border-radius-base: 4px;
+$uni-border-radius-lg: 8px;
+$uni-border-radius-circle: 50%;
+
+$uni-spacing-row-sm: 5px;
+$uni-spacing-row-base: 10px;
+$uni-spacing-row-lg: 15px;
+$uni-spacing-col-sm: 4px;
+$uni-spacing-col-base: 8px;
+$uni-spacing-col-lg: 12px;
+
+$uni-opacity-disabled: 0.3;
+
+$uni-font-size-title: 20px;
+$uni-font-size-subtitle: 26px;
+$uni-font-size-paragraph: 15px;

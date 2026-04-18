@@ -1,0 +1,68 @@
+{
+  "name": "O2O 商户端",
+  "appid": "__UNI__MCHT01",
+  "description": "O2O 跑腿+外卖 商户端（iOS / Android APP + 微信小程序）",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "vueVersion": "3",
+  "h5": {
+    "router": {
+      "mode": "history",
+      "base": "./"
+    }
+  },
+  "app-plus": {
+    "usingComponents": true,
+    "compilerVersion": 3,
+    "splashscreen": {
+      "alwaysShowBeforeRender": true,
+      "waiting": true,
+      "autoclose": true,
+      "delay": 0
+    },
+    "modules": {
+      "Bluetooth": {},
+      "OAuth": {},
+      "Push": {}
+    },
+    "distribute": {
+      "android": {
+        "permissions": [
+          "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+          "<uses-permission android:name=\"android.permission.BLUETOOTH\"/>",
+          "<uses-permission android:name=\"android.permission.BLUETOOTH_ADMIN\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
+          "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>"
+        ],
+        "minSdkVersion": 26,
+        "targetSdkVersion": 34,
+        "abiFilters": ["armeabi-v7a", "arm64-v8a"]
+      },
+      "ios": {
+        "dSYMs": false,
+        "deploymentTarget": "13.0",
+        "privacyDescription": {
+          "NSBluetoothAlwaysUsageDescription": "连接蓝牙打印机自动打印订单小票",
+          "NSLocationWhenInUseUsageDescription": "获取店铺定位用于配送范围设置"
+        }
+      }
+    },
+    "compatible": {
+      "ignoreVersion": true
+    }
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true,
+      "postcss": true,
+      "nodeModules": false
+    },
+    "usingComponents": true,
+    "lazyCodeLoading": "requiredComponents"
+  }
+}

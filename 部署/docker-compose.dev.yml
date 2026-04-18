@@ -1,0 +1,122 @@
+# ============================================================================
+# O2O 跑腿+外卖 平台 开发环境依赖编排
+# 依据 docs/P1_项目初始化/DESIGN_P1_项目初始化.md §五
+# 说明：此文件只拉起【开发依赖】服务（mysql/redis/rabbitmq/minio），
+#       后端/前端仍在宿主机 pnpm dev 启动，便于热更新。
+#
+# 启动：docker compose -f 部署/docker-compose.dev.yml up -d
+# 关闭：docker compose -f 部署/docker-compose.dev.yml down
+# 查看日志：docker compose -f 部署/docker-compose.dev.yml logs -f
+# ============================================================================
+
+name: o2o-dev
+
+services:
+  # ===== MySQL 8.0（主数据库，PRD §5）=====
+  mysql:
+    image: mysql:8.0
+    container_name: o2o-mysql
+    restart: unless-stopped
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: o2o_root_2026
+      MYSQL_DATABASE: o2o_platform
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-authentication-plugin=caching_sha2_password
+      - --max_connections=500
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./docker/mysql/initdb.d:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-po2o_root_2026']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks: [o2o-dev]
+
+  # ===== Redis 7（缓存/分布式锁/定位上报，PRD §5）=====
+  redis:
+    image: redis:7-alpine
+    container_name: o2o-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: ['redis-server', '--requirepass', 'o2o_redis_2026', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'o2o_redis_2026', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [o2o-dev]
+
+  # ===== RabbitMQ 3.13（消息队列，PRD §5）=====
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: o2o-rabbitmq
+    restart: unless-stopped
+    hostname: o2o-rabbitmq
+    ports:
+      - '5672:5672' # AMQP
+      - '15672:15672' # 管理后台 UI（账号：o2o / o2o_rmq_2026）
+    environment:
+      RABBITMQ_DEFAULT_USER: o2o
+      RABBITMQ_DEFAULT_PASS: o2o_rmq_2026
+      RABBITMQ_DEFAULT_VHOST: /
+      TZ: Asia/Shanghai
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks: [o2o-dev]
+
+  # ===== MinIO（对象存储，PRD §5）=====
+  minio:
+    image: minio/minio:latest
+    container_name: o2o-minio
+    restart: unless-stopped
+    ports:
+      - '9000:9000' # S3 API
+      - '9001:9001' # Web Console（默认账号：o2o / o2o_minio_2026）
+    environment:
+      MINIO_ROOT_USER: o2o
+      MINIO_ROOT_PASSWORD: o2o_minio_2026
+      MINIO_REGION: cn-north-1
+      TZ: Asia/Shanghai
+    command: ['server', '/data', '--console-address', ':9001']
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [o2o-dev]
+
+# 数据卷（命名卷，跟随 compose 生命周期管理）
+volumes:
+  mysql-data:
+    name: o2o-mysql-data
+  redis-data:
+    name: o2o-redis-data
+  rabbitmq-data:
+    name: o2o-rabbitmq-data
+  minio-data:
+    name: o2o-minio-data
+
+# 专用开发网络，避免与其他 docker-compose 端口冲突
+networks:
+  o2o-dev:
+    name: o2o-dev
+    driver: bridge

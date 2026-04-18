@@ -1,0 +1,40 @@
+{
+  "name": "O2O 用户端",
+  "appid": "__UNI__USER01",
+  "description": "O2O 跑腿+外卖 用户端（微信小程序）",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "vueVersion": "3",
+  "h5": {
+    "router": {
+      "mode": "history",
+      "base": "./"
+    }
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true,
+      "postcss": true,
+      "nodeModules": false
+    },
+    "usingComponents": true,
+    "lazyCodeLoading": "requiredComponents",
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于展示附近商家与骑手实时位置，提供同城配送服务"
+      }
+    },
+    "requiredPrivateInfos": ["getLocation", "chooseLocation"]
+  },
+  "app-plus": {
+    "usingComponents": true,
+    "compilerVersion": 3,
+    "compatible": {
+      "ignoreVersion": true
+    }
+  }
+}

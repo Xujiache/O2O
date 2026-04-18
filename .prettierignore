@@ -1,0 +1,32 @@
+# 依赖与构建产物
+**/node_modules/**
+**/dist/**
+**/dist-ssr/**
+**/build/**
+**/unpackage/**
+**/coverage/**
+**/.turbo/**
+**/.output/**
+**/.vite/**
+**/.cache/**
+**/.eslintcache
+**/.stylelintcache
+
+# 锁文件
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# 自动生成文件
+**/auto-imports.d.ts
+**/components.d.ts
+**/.auto-import.json
+**/src/types/import/auto-imports.d.ts
+**/src/types/import/components.d.ts
+
+# 基准文档（保持原样，不做格式化）
+O2O外卖+跑腿一体化平台 需求规格说明书.md
+说明文档.md
+docs/**
+管理后台/CHANGELOG.md
+管理后台/CHANGELOG.zh-CN.md

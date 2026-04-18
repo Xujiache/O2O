@@ -1,0 +1,27 @@
+# ----------------------------------------------------------------------------
+# O2O 跑腿+外卖 平台 编辑器统一配置
+# 依据 docs/P1_项目初始化/ACCEPTANCE_P1_项目初始化.md §三
+# ----------------------------------------------------------------------------
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+# Markdown 保留尾部空白以支持换行
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# Windows 脚本使用 CRLF
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# Makefile 必须使用 tab
+[Makefile]
+indent_style = tab

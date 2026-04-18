@@ -1,0 +1,67 @@
+{
+  "name": "o2o-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "O2O 外卖+跑腿一体化平台 monorepo（用户端/商户端/骑手端/管理后台/后端）",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0",
+    "pnpm": ">=8.8.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "prepare": "husky",
+    "dev:user": "pnpm --filter 用户端 dev:mp-weixin",
+    "dev:merchant": "pnpm --filter 商户端 dev:app",
+    "dev:rider": "pnpm --filter 骑手端 dev:app",
+    "dev:admin": "pnpm --filter 管理后台 dev",
+    "dev:server": "pnpm --filter 后端 start:dev",
+    "build:user": "pnpm --filter 用户端 build:mp-weixin",
+    "build:merchant": "pnpm --filter 商户端 build:app",
+    "build:rider": "pnpm --filter 骑手端 build:app",
+    "build:admin": "pnpm --filter 管理后台 build",
+    "build:server": "pnpm --filter 后端 build",
+    "build:all": "pnpm -r --parallel build",
+    "lint": "pnpm -r --parallel --if-present lint",
+    "lint:prettier": "prettier --check \"**/*.{js,cjs,mjs,ts,json,tsx,css,scss,vue,html,md,yaml,yml}\" --ignore-path .gitignore",
+    "format": "prettier --write \"**/*.{js,cjs,mjs,ts,json,tsx,css,scss,vue,html,md,yaml,yml}\" --ignore-path .gitignore",
+    "commit": "git-cz",
+    "docker:dev:up": "docker compose -f 部署/docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker compose -f 部署/docker-compose.dev.yml down",
+    "docker:dev:logs": "docker compose -f 部署/docker-compose.dev.yml logs -f"
+  },
+  "config": {
+    "commitizen": {
+      "path": "node_modules/cz-git"
+    }
+  },
+  "lint-staged": {
+    "*.{js,ts,mjs,mts,cjs,cts,tsx,jsx}": [
+      "prettier --write"
+    ],
+    "*.{json,jsonc}": [
+      "prettier --write"
+    ],
+    "*.vue": [
+      "prettier --write"
+    ],
+    "*.{html,htm,md,mdx}": [
+      "prettier --write"
+    ],
+    "*.{scss,css,less}": [
+      "prettier --write"
+    ],
+    "*.{yaml,yml}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.4.1",
+    "@commitlint/config-conventional": "^19.4.1",
+    "commitizen": "^4.3.0",
+    "cz-git": "^1.11.1",
+    "husky": "^9.1.5",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.5.3"
+  }
+}

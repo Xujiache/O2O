@@ -1,0 +1,65 @@
+{
+  "name": "O2O 骑手端",
+  "appid": "__UNI__RIDER01",
+  "description": "O2O 跑腿+外卖 骑手端（iOS / Android APP）",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "vueVersion": "3",
+  "h5": {
+    "router": {
+      "mode": "history",
+      "base": "./"
+    }
+  },
+  "app-plus": {
+    "usingComponents": true,
+    "compilerVersion": 3,
+    "splashscreen": {
+      "alwaysShowBeforeRender": true,
+      "waiting": true,
+      "autoclose": true,
+      "delay": 0
+    },
+    "modules": {
+      "Geolocation": {},
+      "OAuth": {},
+      "Push": {},
+      "Speech": {}
+    },
+    "distribute": {
+      "android": {
+        "permissions": [
+          "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_BACKGROUND_LOCATION\"/>",
+          "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\"/>",
+          "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_LOCATION\"/>",
+          "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>",
+          "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+          "<uses-permission android:name=\"android.permission.CAMERA\"/>",
+          "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
+        ],
+        "minSdkVersion": 26,
+        "targetSdkVersion": 34,
+        "abiFilters": ["armeabi-v7a", "arm64-v8a"]
+      },
+      "ios": {
+        "dSYMs": false,
+        "deploymentTarget": "13.0",
+        "privacyDescription": {
+          "NSLocationWhenInUseUsageDescription": "配送过程中上报实时位置，保障订单配送全程可追溯",
+          "NSLocationAlwaysAndWhenInUseUsageDescription": "骑手接单后持续上报位置，用于智能派单与轨迹回溯",
+          "NSLocationAlwaysUsageDescription": "骑手接单后持续上报位置，用于智能派单与轨迹回溯",
+          "NSCameraUsageDescription": "拍摄取送件凭证、上传身份证/健康证照片",
+          "NSMicrophoneUsageDescription": "语音联系用户/商家"
+        }
+      }
+    },
+    "compatible": {
+      "ignoreVersion": true
+    }
+  }
+}
