@@ -104,6 +104,40 @@ services:
       retries: 10
     networks: [o2o-dev]
 
+  # ===== TimescaleDB（PostgreSQL 16 + 时序扩展，骑手定位轨迹专用）=====
+  # PRD §5 明确要求"支持时序数据库存储骑手定位轨迹"
+  # 详见 docs/P2_数据库设计/DESIGN_P2_数据库设计.md §八
+  #      后端/src/database/timescale/01_schema.sql
+  # P2 阶段在 P1 基础设施上的合法扩展（提示词 T2.17 授权追加）
+  timescaledb:
+    image: timescale/timescaledb:2.16.1-pg16
+    container_name: o2o-timescaledb
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: o2o_timescale
+      POSTGRES_USER: o2o_ts
+      # 默认开发密码；生产环境通过 K8s Secret / docker secret 注入
+      POSTGRES_PASSWORD: o2o_ts_2026
+      # 时区
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+      # 可选：启用 timescaledb-tune 自动调优（小内存机器可关闭）
+      TIMESCALEDB_TELEMETRY: 'off'
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+      # 容器启动时若 data 目录为空，自动执行 docker-entrypoint-initdb.d 中的 *.sql
+      # 将 timescale schema 挂入，首次启动即建表（具体执行命令见 README.md）
+      - ../后端/src/database/timescale:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U o2o_ts -d o2o_timescale']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [o2o-dev]
+
 # 数据卷（命名卷，跟随 compose 生命周期管理）
 volumes:
   mysql-data:
@@ -114,6 +148,8 @@ volumes:
     name: o2o-rabbitmq-data
   minio-data:
     name: o2o-minio-data
+  timescaledb-data:
+    name: o2o-timescaledb-data
 
 # 专用开发网络，避免与其他 docker-compose 端口冲突
 networks:
