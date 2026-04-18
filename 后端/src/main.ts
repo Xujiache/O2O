@@ -1,19 +1,176 @@
 import { NestFactory } from '@nestjs/core'
 import { ConfigService } from '@nestjs/config'
-import { Logger, ValidationPipe, VersioningType } from '@nestjs/common'
+import { Logger, ValidationPipe, VersioningType, type INestApplication } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { AppModule } from './app.module'
 
 /**
+ * Swagger 分组定义（DESIGN_P3 §7.3）
+ *
+ * 设计：
+ * - 5 组分别独立 URL，由「ApiTags 中文前缀 + 关键字」过滤
+ * - "通用 / 文件 / 地图" 等横切模块在多个端展示（路径白名单 + 关键字命中）
+ * - includeFilter：返回 true 的 controller 才进该分组
+ *
+ * 用途：buildSwaggerGroups 内部使用
+ */
+const SWAGGER_GROUPS: Array<{
+  path: 'docs/user' | 'docs/merchant' | 'docs/rider' | 'docs/admin' | 'docs/internal'
+  title: string
+  desc: string
+  includeKeywords: string[]
+}> = [
+  {
+    path: 'docs/user',
+    title: 'O2O 平台 API · 用户端',
+    desc: '面向 C 端微信小程序：登录 / 个人中心 / 地址 / 文件 / 地图 / 消息',
+    includeKeywords: [
+      '用户',
+      'User',
+      '文件',
+      'File',
+      '地图',
+      'Map',
+      '消息',
+      'Message',
+      '认证',
+      'Auth'
+    ]
+  },
+  {
+    path: 'docs/merchant',
+    title: 'O2O 平台 API · 商户端',
+    desc: '面向商户 APP / 后台：店铺管理 / 资质 / 订单（P4）',
+    includeKeywords: [
+      '商户',
+      'Merchant',
+      '文件',
+      'File',
+      '地图',
+      'Map',
+      '消息',
+      'Message',
+      '认证',
+      'Auth'
+    ]
+  },
+  {
+    path: 'docs/rider',
+    title: 'O2O 平台 API · 骑手端',
+    desc: '面向骑手 APP：登录 / 接单 / 位置上报 / 钱包',
+    includeKeywords: [
+      '骑手',
+      'Rider',
+      '文件',
+      'File',
+      '地图',
+      'Map',
+      '消息',
+      'Message',
+      '认证',
+      'Auth'
+    ]
+  },
+  {
+    path: 'docs/admin',
+    title: 'O2O 平台 API · 管理后台',
+    desc: '运营 / 客服 / 风控 / 财务 后台',
+    includeKeywords: [
+      '管理',
+      'Admin',
+      '黑名单',
+      '文件',
+      'File',
+      '地图',
+      'Map',
+      '消息',
+      'Message',
+      '认证',
+      'Auth'
+    ]
+  },
+  {
+    path: 'docs/internal',
+    title: 'O2O 平台 API · 内部接口',
+    desc: '仅服务间互调：高德缓存预热 / 配送范围 polygon / 健康检查',
+    includeKeywords: ['内部', 'Internal', '健康', 'Health', '地图', 'Map']
+  }
+]
+
+/**
+ * 构建并挂载 5 组 Swagger
+ *
+ * 参数：app NestApplication；config ConfigService
+ * 返回值：void
+ * 用途：bootstrap 内部调用
+ */
+function buildSwaggerGroups(app: INestApplication, config: ConfigService): void {
+  const version = config.get<string>('app.version') ?? '0.1.0'
+  for (const group of SWAGGER_GROUPS) {
+    const doc = new DocumentBuilder()
+      .setTitle(group.title)
+      .setDescription(`${group.desc}\n\n基准：PRD V1.0 + docs/P3_后端基础服务/DESIGN_P3_*.md`)
+      .setVersion(version)
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
+        'access-token'
+      )
+      .build()
+    const document = SwaggerModule.createDocument(app, doc, {
+      include: [],
+      operationIdFactory: (controllerKey, methodKey) => `${controllerKey}_${methodKey}`
+    })
+    // 后置过滤：按 tag 关键字命中
+    const filtered = JSON.parse(JSON.stringify(document)) as typeof document
+    if (filtered.paths) {
+      for (const [path, ops] of Object.entries(filtered.paths)) {
+        const opMap = ops as Record<string, { tags?: string[] }>
+        const stillMatched: Record<string, unknown> = {}
+        for (const [method, op] of Object.entries(opMap)) {
+          const tags = op?.tags ?? []
+          const hit = tags.some((t) => group.includeKeywords.some((kw) => t.includes(kw)))
+          if (hit) stillMatched[method] = op
+        }
+        if (Object.keys(stillMatched).length > 0) {
+          filtered.paths[path] = stillMatched
+        } else {
+          delete filtered.paths[path]
+        }
+      }
+    }
+    SwaggerModule.setup(group.path, app, filtered, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        displayOperationId: false,
+        docExpansion: 'list'
+      }
+    })
+  }
+  // 兼容旧版 /docs 仍可访问全量
+  const fullDoc = new DocumentBuilder()
+    .setTitle('O2O 平台 API · 全量')
+    .setDescription('全量接口（5 大端汇总）；分组文档见 /docs/user|merchant|rider|admin|internal')
+    .setVersion(version)
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
+      'access-token'
+    )
+    .build()
+  const fullDocument = SwaggerModule.createDocument(app, fullDoc)
+  SwaggerModule.setup('docs', app, fullDocument, {
+    swaggerOptions: { persistAuthorization: true }
+  })
+}
+
+/**
  * 应用启动函数
- * 功能：创建 Nest 应用 → 读取配置 → 注入全局管道/前缀/CORS → 挂载 Swagger → 监听端口
+ * 功能：创建 Nest 应用 → 读取配置 → 注入全局管道/前缀/CORS → 挂载 Swagger 5 组 → 监听端口
  * 参数：无
  * 返回值：Promise<void>
  * 用途：node dist/main 或 nest start
  */
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
-    // 使用 Nest 内置 Logger，后续 P3 阶段可替换为 Pino/winston
     logger: ['error', 'warn', 'log', 'debug', 'verbose']
   })
   const config = app.get(ConfigService)
@@ -21,22 +178,24 @@ async function bootstrap(): Promise<void> {
   const prefix = config.get<string>('app.prefix') ?? '/api/v1'
   const env = config.get<string>('app.env') ?? 'development'
 
-  // ===== 全局前缀 =====
   app.setGlobalPrefix(prefix, {
-    exclude: ['/health', '/docs', '/docs-json']
+    exclude: [
+      '/health',
+      '/docs',
+      '/docs-json',
+      '/docs/user',
+      '/docs/merchant',
+      '/docs/rider',
+      '/docs/admin',
+      '/docs/internal'
+    ]
   })
-
-  // ===== API 版本化（header 或路径），P3+ 阶段按需启用 =====
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' })
-
-  // ===== CORS（开发环境放开；生产由网关层控制）=====
   app.enableCors({
     origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
   })
-
-  // ===== 全局校验管道（class-validator） =====
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -46,28 +205,20 @@ async function bootstrap(): Promise<void> {
     })
   )
 
-  // ===== Swagger OpenAPI =====
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('O2O 平台 API')
-    .setDescription('O2O 跑腿+外卖 一体化平台后端接口文档（对齐 PRD V1.0）')
-    .setVersion(config.get<string>('app.version') ?? '0.1.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
-      'access-token'
-    )
-    .build()
-  const document = SwaggerModule.createDocument(app, swaggerConfig)
-  SwaggerModule.setup('docs', app, document, {
-    swaggerOptions: { persistAuthorization: true }
-  })
+  buildSwaggerGroups(app, config)
 
   await app.listen(port, '0.0.0.0')
 
   const logger = new Logger('Bootstrap')
-  logger.log(`🚀 [${env}] O2O 后端 已启动，监听 :${port}`)
-  logger.log(`📘 API 前缀：${prefix}`)
-  logger.log(`📚 Swagger：http://localhost:${port}/docs`)
-  logger.log(`❤️  健康检查：http://localhost:${port}/health`)
+  logger.log(`[${env}] O2O 后端 已启动，监听 :${port}`)
+  logger.log(`API 前缀：${prefix}`)
+  logger.log(`Swagger 全量：http://localhost:${port}/docs`)
+  logger.log(`Swagger 用户端：http://localhost:${port}/docs/user`)
+  logger.log(`Swagger 商户端：http://localhost:${port}/docs/merchant`)
+  logger.log(`Swagger 骑手端：http://localhost:${port}/docs/rider`)
+  logger.log(`Swagger 管理后台：http://localhost:${port}/docs/admin`)
+  logger.log(`Swagger 内部接口：http://localhost:${port}/docs/internal`)
+  logger.log(`健康检查：http://localhost:${port}/health`)
 }
 
 bootstrap().catch((err) => {

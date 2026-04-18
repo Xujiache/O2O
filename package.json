@@ -63,5 +63,20 @@
     "husky": "^9.1.5",
     "lint-staged": "^15.5.2",
     "prettier": "^3.5.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "sharp",
+      "@img/sharp-libvips-win32-x64",
+      "@img/sharp-libvips-linux-x64",
+      "@img/sharp-libvips-darwin-arm64",
+      "@img/sharp-libvips-darwin-x64",
+      "@img/sharp-win32-x64",
+      "@img/sharp-linux-x64",
+      "@img/sharp-darwin-arm64",
+      "@img/sharp-darwin-x64",
+      "esbuild"
+    ]
   }
 }

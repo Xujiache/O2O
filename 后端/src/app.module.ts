@@ -3,7 +3,13 @@ import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core'
 import configuration from './config/configuration'
 import { envValidationSchema } from './config/env.validation'
-import { AllExceptionsFilter, LoggingInterceptor, TransformInterceptor } from './common'
+import {
+  AllExceptionsFilter,
+  HttpExceptionFilter,
+  LoggingInterceptor,
+  TimeoutInterceptor,
+  TransformInterceptor
+} from './common'
 import { DatabaseModule } from './database/database.module'
 import { QueuesModule } from './queues/queues.module'
 import { HealthModule } from './health/health.module'
@@ -66,11 +72,12 @@ import { CustomerModule } from './modules/customer/customer.module'
     CustomerModule
   ],
   providers: [
-    // 全局异常过滤器：统一响应格式
+    /* 全局异常过滤器：HttpException 走专用 filter（含 BusinessException），其余走兜底 filter */
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
-    // 全局拦截器：请求日志
+    /* 全局拦截器：注入 traceId + 请求日志 → 超时控制 → 响应体统一包裹 */
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
-    // 全局拦截器：响应体包装为 { code, message, data, timestamp }
+    { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor }
   ]
 })

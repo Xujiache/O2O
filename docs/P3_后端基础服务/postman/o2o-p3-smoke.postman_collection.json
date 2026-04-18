@@ -1,0 +1,504 @@
+{
+  "info": {
+    "name": "O2O P3 Smoke",
+    "_postman_id": "c93f4b0e-1234-4567-89ab-cd1234567890",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "O2O 平台 P3 后端基础服务冒烟集；覆盖 Auth / User / Message / File / Map 5 大模块；员工 C 在 P3/T3.25 起骨架，员工 A/B 完成各自模块后填充 Auth / User / Message 用例的实际请求体。"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/wx-mp/login（占位 mock；待员工 A 完成）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"<wx-jscode>\",\n  \"encryptedData\": \"<optional>\",\n  \"iv\": \"<optional>\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/wx-mp/login", "host": ["{{baseUrl}}"], "path": ["auth", "wx-mp", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200/2xx 或 mock', () => pm.expect([200, 201, 401, 502]).to.include(pm.response.code))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/sms/send（占位 mock；待员工 A 完成）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"13800001234\",\n  \"scene\": \"login\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/sms/send", "host": ["{{baseUrl}}"], "path": ["auth", "sms", "send"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200/2xx 或 mock', () => pm.expect([200, 201, 400, 502]).to.include(pm.response.code))"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "GET /me（占位 mock；待员工 B 完成）",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/me", "host": ["{{baseUrl}}"], "path": ["me"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200/2xx 或 401 mock', () => pm.expect([200, 401, 404]).to.include(pm.response.code))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/blacklist（占位 mock；待员工 B 完成）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetType\": 1,\n  \"targetId\": \"123\",\n  \"reason\": \"违规推广\",\n  \"expireAt\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/admin/blacklist", "host": ["{{baseUrl}}"], "path": ["admin", "blacklist"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200/2xx 或 401', () => pm.expect([200, 201, 401, 403, 404]).to.include(pm.response.code))"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Message",
+      "item": [
+        {
+          "name": "POST /message/send（占位 mock；待员工 B 完成）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"ORDER_CREATED\",\n  \"ownerType\": 1,\n  \"ownerId\": \"123\",\n  \"data\": { \"orderNo\": \"T20260419AB123\" }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/message/send", "host": ["{{baseUrl}}"], "path": ["message", "send"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx 或 mock', () => pm.expect([200, 201, 401, 404]).to.include(pm.response.code))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /me/inbox（占位 mock；待员工 B 完成）",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/me/inbox?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["me", "inbox"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx 或 401', () => pm.expect([200, 401, 404]).to.include(pm.response.code))"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "File",
+      "item": [
+        {
+          "name": "POST /file/upload —— 代理上传（合法图片）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Uploader-Type", "value": "4" },
+              { "key": "X-Uploader-Id", "value": "1" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "./tests/fixtures/avatar.jpg" },
+                { "key": "bizModule", "type": "text", "value": "avatar" },
+                { "key": "isPublic", "type": "text", "value": "true" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/file/upload", "host": ["{{baseUrl}}"], "path": ["file", "upload"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200))",
+                  "const data = pm.response.json().data",
+                  "pm.environment.set('lastFileId', data.id)",
+                  "pm.environment.set('lastFileNo', data.fileNo)",
+                  "pm.test('返回 url + fileNo + bucket', () => {",
+                  "  pm.expect(data.url).to.be.a('string')",
+                  "  pm.expect(data.fileNo).to.match(/^F/)",
+                  "  pm.expect(data.bucket).to.equal('o2o-public')",
+                  "})"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /file/upload —— 拒绝示例（错误 MIME application/zip → 415）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Uploader-Type", "value": "4" },
+              { "key": "X-Uploader-Id", "value": "1" },
+              { "key": "Content-Type", "value": "multipart/form-data" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "./tests/fixtures/bad.zip" },
+                { "key": "bizModule", "type": "text", "value": "other" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/file/upload", "host": ["{{baseUrl}}"], "path": ["file", "upload"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('415 不支持的 MIME', () => pm.response.to.have.status(415))",
+                  "pm.test('错误码 10001', () => pm.expect(pm.response.json().code).to.equal(10001))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /file/sts —— STS 临时凭证",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Uploader-Type", "value": "4" },
+              { "key": "X-Uploader-Id", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bizModule\": \"qual\",\n  \"isPublic\": false,\n  \"contentType\": \"application/pdf\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/file/sts", "host": ["{{baseUrl}}"], "path": ["file", "sts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200))",
+                  "const data = pm.response.json().data",
+                  "pm.test('凭证字段齐全', () => {",
+                  "  pm.expect(data.provider).to.be.oneOf(['minio','ali-oss'])",
+                  "  pm.expect(data.bucket).to.be.a('string')",
+                  "  pm.expect(data.keyPrefix).to.match(/qual\\/\\d{6}\\//)",
+                  "  pm.expect(data.expiration).to.be.greaterThan(Date.now())",
+                  "})"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /file/presign —— 预签名 PUT URL（合法 PNG）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Uploader-Type", "value": "4" },
+              { "key": "X-Uploader-Id", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bizModule\": \"avatar\",\n  \"fileName\": \"head.png\",\n  \"contentType\": \"image/png\",\n  \"isPublic\": true,\n  \"expiresSec\": 900\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/file/presign", "host": ["{{baseUrl}}"], "path": ["file", "presign"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200))",
+                  "const data = pm.response.json().data",
+                  "pm.test('返回 url + bucket + objectKey', () => {",
+                  "  pm.expect(data.url).to.match(/^http/)",
+                  "  pm.expect(data.bucket).to.equal('o2o-public')",
+                  "  pm.expect(data.objectKey).to.match(/^avatar\\//)",
+                  "  pm.expect(data.contentType).to.equal('image/png')",
+                  "})"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /file/:id —— 软删（owner）",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-Uploader-Type", "value": "4" },
+              { "key": "X-Uploader-Id", "value": "1" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/file/{{lastFileId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["file", "{{lastFileId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200/404', () => pm.expect([200, 404]).to.include(pm.response.code))"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Map",
+      "item": [
+        {
+          "name": "GET /map/distance —— 直线距离（type=0，本地算）",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/map/distance?fromLng=116.40739&fromLat=39.90402&toLng=116.32213&toLat=39.89396&type=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["map", "distance"],
+              "query": [
+                { "key": "fromLng", "value": "116.40739" },
+                { "key": "fromLat", "value": "39.90402" },
+                { "key": "toLng", "value": "116.32213" },
+                { "key": "toLat", "value": "39.89396" },
+                { "key": "type", "value": "0" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200))",
+                  "const data = pm.response.json().data",
+                  "pm.test('距离 6~8km，type=line', () => {",
+                  "  pm.expect(data.type).to.equal('line')",
+                  "  pm.expect(data.distance).to.be.greaterThan(6000)",
+                  "  pm.expect(data.distance).to.be.lessThan(8000)",
+                  "})"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /map/shop-area —— 预热商户配送 polygon",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopId\": \"S1\",\n  \"polygon\": { \"type\": \"Polygon\", \"coordinates\": [[[116.47,39.99],[116.49,39.99],[116.49,39.97],[116.47,39.97],[116.47,39.99]]] },\n  \"deliveryFee\": 5,\n  \"minOrder\": 20\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/map/shop-area", "host": ["{{baseUrl}}"], "path": ["map", "shop-area"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', () => pm.response.to.have.status(200))"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /map/within-area —— 配送范围校验（点在内）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopId\": \"S1\",\n  \"lng\": 116.48,\n  \"lat\": 39.98\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/map/within-area", "host": ["{{baseUrl}}"], "path": ["map", "within-area"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200))",
+                  "pm.test('within=true', () => pm.expect(pm.response.json().data.within).to.equal(true))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /map/within-area —— 配送范围校验（点在外）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopId\": \"S1\",\n  \"lng\": 116.46,\n  \"lat\": 39.98\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/map/within-area", "host": ["{{baseUrl}}"], "path": ["map", "within-area"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200))",
+                  "pm.test('within=false', () => pm.expect(pm.response.json().data.within).to.equal(false))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /map/rider/report —— 骑手位置上报",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderId\": \"R1\",\n  \"cityCode\": \"110100\",\n  \"locations\": [\n    { \"ts\": 1745040000000, \"lng\": 116.48, \"lat\": 39.99, \"speedKmh\": 18, \"dir\": 90, \"battery\": 80, \"orderNo\": null }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/map/rider/report", "host": ["{{baseUrl}}"], "path": ["map", "rider", "report"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200))",
+                  "const data = pm.response.json().data",
+                  "pm.test('accepted=1, geoUpdated, batchId', () => {",
+                  "  pm.expect(data.accepted).to.equal(1)",
+                  "  pm.expect(data.batchId).to.match(/^rider-loc-/)",
+                  "})"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /map/rider/:id/track/:orderNo —— 轨迹查询",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/map/rider/R1/track/T20260419AB123",
+              "host": ["{{baseUrl}}"],
+              "path": ["map", "rider", "R1", "track", "T20260419AB123"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200/502（取决于 TimescaleDB 是否启动）', () => pm.expect([200, 502]).to.include(pm.response.code))",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json().data",
+                  "  pm.test('GeoJSON LineString', () => pm.expect(data.geometry.type).to.equal('LineString'))",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "lastFileId", "value": "" },
+    { "key": "lastFileNo", "value": "" }
+  ]
+}
