@@ -88,6 +88,13 @@ src/types/import/components.d.ts
 部署/docker-data/
 部署/**/data/
 
+# IDE 自动产物（sessionId 每次重启变化，不应入库）
+.cursor/mcp.json
+
+# Lint 临时输出（任意子目录）
+lint_output.txt
+**/lint.json
+
 # 其他
 *.local
 *.tgz
