@@ -326,3 +326,75 @@ node 骑手端/scripts/kalman-test.mjs   7 passed, 0 failed (V7.19)
 > **V2.0 单 Agent 模式实战三次验证（继 P5/P6）**：vs P3 多员工 9 处集成修复，本期 7 Sprint 串行 **0 集成漏洞 / 0 P0 阻塞**。
 > 7 项 P6-R1 教训全部规避（特别是 I-01 nativePlugin 真编 + I-02 真消费 + I-03 占位 + I-04 三方一致 + I-05 STORAGE_KEYS）。
 > P7 全部完成，请审查并触发 P8 阶段。
+
+---
+
+## 十四、R1 修复记录（2026-04-19）
+
+> **触发**：P7-REVIEW-01 审查清单 1 项 R-01（其余 15 项物理不可修，归 P9）
+> **执行**：单 Agent V2.0；1 个 commit + push；4 项门禁全过；不破坏其它已通过代码
+> **commit**：见本节末「R1 commit」
+
+### R-01 [P3 本轮必修] new-dispatch.mp3 0 字节占位补真最小有效 MP3
+
+| 维度 | 修复前 | 修复后 |
+|---|---|---|
+| 文件 | `骑手端/src/static/audio/new-dispatch.mp3` | 同 |
+| 大小 | **0 字节** | **432 字节**（3 frame × 144B） |
+| 是否合法 MP3 | ❌ 0 字节非法（audioCtx.play 触发 onError，仅 ringtone.ts 兜底） | ✅ MPEG-1 Layer III header `FF FB 18 C0`（32 kbps / 32 kHz / mono / silent）≈ 0.108s |
+| 与 silent.wav (45B) / marker (67B) 一致性 | ❌ 不一致（其他都是真最小有效） | ✅ 一致（均真最小有效） |
+| build 行为 | DONE Build complete（onError 已兜底） | DONE Build complete + audioCtx 不再触发 onError |
+| 提示词 §4.3.6 规避 | 🟡 部分（只创建 0B 文件，未"最小有效"） | ✅ 完整（5 个资源全部真最小有效） |
+
+**选用方案**：方案 B（Node 硬编码最小 MPEG-1 Layer III frame）
+
+**理由**：
+- 方案 A（ffmpeg）：本机 PowerShell 无 ffmpeg 可执行（`ffmpeg : 无法将"ffmpeg"项识别为 cmdlet`）
+- 方案 B（Node 硬编码）：100% 可控，无外部依赖；432 字节 ≤ 1KB 上限；
+  header `FF FB 18 C0` 标准 MPEG-1 Layer III，3 frame 给解码器锁定 sync 余量
+- 方案 C（保持 0 字节）：未选；原因：能做到真最小有效就不应降级
+
+**生成脚本**：`骑手端/scripts/gen-min-mp3.mjs`（44 行 Node ESM，含完整 frame header 注释）
+- 输出：`骑手端/src/static/audio/new-dispatch.mp3` 432 字节
+- 校验：`Get-ChildItem` 长度 = 432；首 4 字节 = `FF FB 18 C0`
+- 可重复运行（幂等）
+
+**同步更新**：
+- `骑手端/src/static/README.md`：mp3 行字节数 0 → 432，状态 ⚠️ → ✅，新增 P7-R1 / R-01 生成命令章节
+- 文档明确"无 ffmpeg 环境降级方案 B"理由
+
+### R-02 [P3 必归 P9] Sass `[legacy-js-api]` 警告
+
+**未修原因**：需升级 `@dcloudio/vite-plugin-uni` 到支持 Modern API 版本（alpha 升级可能 break P5/P6/P7 三端构建），归 P9 工具链统一处理。
+
+### L7-01~L7-14（14 项）
+
+**未修原因**：物理不可修（真机 / SDK key / 设计师资源 / 后端联动），归 P9 集成测试部署。
+
+---
+
+### R1 自验收
+
+| 检查 | 结果 |
+|---|---|
+| `pnpm lint:check --max-warnings 0` | ✅ Exit 0 |
+| `pnpm lint:stylelint:check` | ✅ Exit 0 |
+| `pnpm type-check` | ✅ Exit 0 |
+| `pnpm build:h5` | ✅ Exit 0 + DONE Build complete |
+| MP3 字节数 | ✅ 432 字节（≤ 1KB 提示词上限） |
+| MP3 header 校验 | ✅ `FF FB 18 C0`（标准 MPEG-1 Layer III） |
+| static 目录所有资源真有效 | ✅ wav 45B + mp3 432B + 3 png 67B |
+
+### R1 不破坏的代码（合规约束）
+
+- ❌ 不触碰 R-02（Sass legacy-js-api，归 P9）
+- ❌ 不触碰 L7-01~L7-14（物理不可修，归 P9）
+- ❌ 不修改其它已通过模块（仅新增 1 脚本 + 1 mp3 替换 + 1 README 更新 + 本报告 §十四追加）
+- ❌ 不重写 P7 完成报告（仅末尾追加 §十四）
+
+### R1 commit
+
+`fix(骑手端): P7-R1 修复 — new-dispatch.mp3 占位补最小有效（R-01）`
+
+> R1 修复 1/1 已闭环，等待用户复审。
+> 完成报告 §十二 "10 项 P5/P6 教训规避"中第 6 项（P6/I-03 静态资源不创建占位）由"🟡 部分"升至"✅ 完整"。
