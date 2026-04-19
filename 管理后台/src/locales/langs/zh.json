@@ -344,5 +344,134 @@
     "zebra": "斑马纹",
     "border": "边框",
     "headerBackground": "表头背景"
+  },
+  "biz": {
+    "common": {
+      "search": "搜索",
+      "reset": "重置",
+      "create": "新增",
+      "edit": "编辑",
+      "delete": "删除",
+      "confirm": "确认",
+      "cancel": "取消",
+      "submit": "提交",
+      "close": "关闭",
+      "audit": "审核",
+      "pass": "通过",
+      "reject": "驳回",
+      "rejectReason": "请填写驳回原因",
+      "actions": "操作",
+      "detail": "详情",
+      "export": "导出",
+      "exportAsync": "异步导出",
+      "exportProgress": "导出中... ",
+      "downloadNow": "立即下载",
+      "batchPass": "批量通过",
+      "batchReject": "批量驳回",
+      "ban": "封禁",
+      "unban": "解封",
+      "selectDateRange": "选择时间",
+      "today": "今日",
+      "yesterday": "昨日",
+      "last7": "近 7 天",
+      "last30": "近 30 天",
+      "thisMonth": "本月",
+      "lastMonth": "上月",
+      "danger": "危险",
+      "dangerHint": "请输入「确认」继续",
+      "needTypeConfirm": "需输入「确认」",
+      "operationSuccess": "操作成功",
+      "operationFailed": "操作失败"
+    },
+    "menu": {
+      "dashboard": {
+        "root": "数据大盘",
+        "overview": "概览",
+        "trend": "趋势",
+        "ops": "运营数据",
+        "monitor": "实时监控"
+      },
+      "user": {
+        "root": "用户管理",
+        "list": "用户列表",
+        "risk": "风控"
+      },
+      "merchant": {
+        "root": "商户管理",
+        "audit": "入驻审核",
+        "list": "商户列表",
+        "risk": "商户风控"
+      },
+      "shop": {
+        "list": "店铺列表",
+        "noticeAudit": "公告审核"
+      },
+      "rider": {
+        "root": "骑手管理",
+        "audit": "入驻审核",
+        "list": "骑手列表",
+        "transferAudit": "转单审核",
+        "reward": "奖惩配置",
+        "levelConfig": "等级配置",
+        "risk": "骑手风控"
+      },
+      "order": {
+        "root": "订单管理",
+        "list": "全量订单",
+        "cancelRefund": "取消退款审核",
+        "complaint": "投诉",
+        "arbitration": "仲裁"
+      },
+      "productContent": {
+        "root": "商品与内容",
+        "productList": "商品列表",
+        "productViolation": "违规商品",
+        "productCategory": "商品分类",
+        "banner": "Banner",
+        "quickEntry": "快捷入口",
+        "hotSearch": "热搜",
+        "notice": "公告",
+        "reviewList": "评价管理",
+        "reviewAppeal": "差评申诉"
+      },
+      "ops": {
+        "root": "运营管理",
+        "coupon": "优惠券",
+        "promotion": "营销活动",
+        "push": "消息推送",
+        "pushTemplate": "推送模板",
+        "region": "城市区域"
+      },
+      "finance": {
+        "root": "财务管理",
+        "overview": "财务概览",
+        "settlementRule": "分账规则",
+        "settlementRecord": "分账记录",
+        "withdrawAudit": "提现审核",
+        "bill": "账单对账",
+        "invoiceAudit": "发票审核",
+        "reconciliation": "对账管理"
+      },
+      "systemBiz": {
+        "root": "系统管理(业务)",
+        "admin": "管理员",
+        "role": "角色",
+        "permission": "权限",
+        "dict": "字典",
+        "operationLog": "操作日志",
+        "apiLog": "接口日志",
+        "systemConfig": "系统配置",
+        "appConfig": "APP 配置"
+      },
+      "csRisk": {
+        "root": "客服与风控",
+        "ticket": "工单",
+        "arbitration": "仲裁",
+        "rule": "风控规则",
+        "riskOrder": "风险订单",
+        "cheat": "刷单/套现",
+        "record": "处理记录"
+      }
+    }
   }
 }

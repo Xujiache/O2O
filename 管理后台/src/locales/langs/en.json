@@ -344,5 +344,134 @@
     "zebra": "Zebra",
     "border": "Border",
     "headerBackground": "Header BG"
+  },
+  "biz": {
+    "common": {
+      "search": "Search",
+      "reset": "Reset",
+      "create": "Create",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "submit": "Submit",
+      "close": "Close",
+      "audit": "Audit",
+      "pass": "Pass",
+      "reject": "Reject",
+      "rejectReason": "Reject reason required",
+      "actions": "Actions",
+      "detail": "Detail",
+      "export": "Export",
+      "exportAsync": "Async Export",
+      "exportProgress": "Exporting... ",
+      "downloadNow": "Download",
+      "batchPass": "Batch Pass",
+      "batchReject": "Batch Reject",
+      "ban": "Ban",
+      "unban": "Unban",
+      "selectDateRange": "Date Range",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last7": "Last 7 days",
+      "last30": "Last 30 days",
+      "thisMonth": "This Month",
+      "lastMonth": "Last Month",
+      "danger": "Dangerous",
+      "dangerHint": "Type Confirm to continue",
+      "needTypeConfirm": "Need type Confirm",
+      "operationSuccess": "Success",
+      "operationFailed": "Failed"
+    },
+    "menu": {
+      "dashboard": {
+        "root": "Dashboard",
+        "overview": "Overview",
+        "trend": "Trend",
+        "ops": "Ops",
+        "monitor": "Monitor"
+      },
+      "user": {
+        "root": "Users",
+        "list": "User List",
+        "risk": "Risk"
+      },
+      "merchant": {
+        "root": "Merchants",
+        "audit": "Onboard Audit",
+        "list": "Merchant List",
+        "risk": "Merchant Risk"
+      },
+      "shop": {
+        "list": "Shops",
+        "noticeAudit": "Notice Audit"
+      },
+      "rider": {
+        "root": "Riders",
+        "audit": "Onboard Audit",
+        "list": "Rider List",
+        "transferAudit": "Transfer Audit",
+        "reward": "Reward & Punish",
+        "levelConfig": "Level Config",
+        "risk": "Rider Risk"
+      },
+      "order": {
+        "root": "Orders",
+        "list": "All Orders",
+        "cancelRefund": "Cancel & Refund",
+        "complaint": "Complaint",
+        "arbitration": "Arbitration"
+      },
+      "productContent": {
+        "root": "Product & Content",
+        "productList": "Products",
+        "productViolation": "Violations",
+        "productCategory": "Categories",
+        "banner": "Banner",
+        "quickEntry": "Quick Entry",
+        "hotSearch": "Hot Search",
+        "notice": "Notice",
+        "reviewList": "Reviews",
+        "reviewAppeal": "Appeal"
+      },
+      "ops": {
+        "root": "Operation",
+        "coupon": "Coupon",
+        "promotion": "Promotion",
+        "push": "Push",
+        "pushTemplate": "Push Template",
+        "region": "Region"
+      },
+      "finance": {
+        "root": "Finance",
+        "overview": "Overview",
+        "settlementRule": "Settlement Rule",
+        "settlementRecord": "Settlement Record",
+        "withdrawAudit": "Withdraw Audit",
+        "bill": "Bill",
+        "invoiceAudit": "Invoice Audit",
+        "reconciliation": "Reconciliation"
+      },
+      "systemBiz": {
+        "root": "System (Biz)",
+        "admin": "Admin",
+        "role": "Role",
+        "permission": "Permission",
+        "dict": "Dict",
+        "operationLog": "Operation Log",
+        "apiLog": "API Log",
+        "systemConfig": "System Config",
+        "appConfig": "APP Config"
+      },
+      "csRisk": {
+        "root": "CS & Risk",
+        "ticket": "Ticket",
+        "arbitration": "Arbitration",
+        "rule": "Risk Rule",
+        "riskOrder": "Risk Order",
+        "cheat": "Cheat",
+        "record": "Record"
+      }
+    }
   }
 }
