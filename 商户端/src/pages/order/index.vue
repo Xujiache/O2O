@@ -144,6 +144,10 @@
   let unsubscribeNewOrder: (() => void) | null = null
   let unsubscribeStatusChanged: (() => void) | null = null
 
+  /** 列表 refresh 节流：onShow 5min 内只刷新一次，避免频繁切 Tab 触发抖动（R1 / I-07） */
+  const REFRESH_THROTTLE_MS = 5 * 60 * 1000
+  let lastRefreshTs = 0
+
   const emptyTitle = computed<string>(
     () => `暂无${tabs.find((t) => t.key === curTab.value)?.label ?? ''}订单`
   )
@@ -156,8 +160,12 @@
   })
 
   onShow(() => {
+    /* tab 计数始终拉一次（轻量），列表 refresh 走 5min 节流 */
     void loadTabCounts()
-    void refresh()
+    if (Date.now() - lastRefreshTs > REFRESH_THROTTLE_MS) {
+      lastRefreshTs = Date.now()
+      void refresh()
+    }
   })
 
   onHide(() => {
@@ -219,6 +227,8 @@
     hasMore.value = true
     orders.value = []
     await loadMore()
+    /* R1 / I-07：refresh 完成后同步刷新节流时间戳，避免下一次 onShow 立即又触发 */
+    lastRefreshTs = Date.now()
   }
 
   async function onRefresh() {

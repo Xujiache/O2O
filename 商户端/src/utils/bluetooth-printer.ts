@@ -1,15 +1,16 @@
 /**
  * @file bluetooth-printer.ts
- * @stage P6/T6.40 (Sprint 6)
+ * @stage P6/T6.40 (Sprint 6) + P6-R1 (I-01/I-02)
  * @desc 蓝牙小票打印封装（ESC/POS）
  *
  * 协议：ESC/POS（58mm 32 字符宽 / 80mm 48 字符宽）
  * 平台：仅 APP 端（iOS / Android）；小程序版完全跳过
  * 状态机：disconnected → connecting → connected → printing → error
  *
- * P6 范围：
- *   - 暴露 BluetoothPrinter 单例 + 全部接口
- *   - 真实 ESC/POS 模板与多机并发归 S6 / T6.40 详细实现
+ * R1 修复：
+ *   - I-01：connect() 后真实 getBLEDeviceServices + getBLEDeviceCharacteristics 查找可写
+ *           特征值；任一步失败 state='error' + reject；8s 超时守卫
+ *   - I-02：doPrint() 拆出 writeOnce()，按 task.copies 循环写入（默认 1 张）
  *
  * @author 单 Agent V2.0 (P6 商户端)
  */
@@ -33,6 +34,7 @@ export interface PrinterDevice {
 export interface PrintTask {
   id: string
   order: MerchantOrder
+  /** 联次数（厨房/配送/客户）；每次 doPrint 内按此值循环写入 */
   copies: number
   retry: number
   /** 1 厨房联 / 2 配送联 / 3 客户联 */
@@ -43,6 +45,11 @@ export interface PrintTask {
 function isBluetoothSupported(): boolean {
   return typeof plus !== 'undefined' && Boolean(plus)
 }
+
+/** 连接 + 服务/特征值查找超时（毫秒） */
+const CONNECT_DISCOVER_TIMEOUT_MS = 8000
+/** 多份打印之间的间隔（避免缓冲溢出） */
+const PRINT_COPY_INTERVAL_MS = 200
 
 class BluetoothPrinter {
   private state: PrinterState = 'disconnected'
@@ -110,7 +117,16 @@ class BluetoothPrinter {
     })
   }
 
-  /** 连接打印机 */
+  /**
+   * 连接打印机（R1 / I-01）
+   *
+   * 流程：
+   *   1. createBLEConnection
+   *   2. getBLEDeviceServices → 找首个 isPrimary 的 service
+   *   3. getBLEDeviceCharacteristics → 找首个 properties.write===true || writeNoResponse===true 的 characteristic
+   *   4. 全部赋值后 state='connected'；任一步失败 state='error' + reject
+   *   5. 8s 总超时守卫
+   */
   connect(device: PrinterDevice): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!isBluetoothSupported()) {
@@ -118,19 +134,76 @@ class BluetoothPrinter {
         return
       }
       this.state = 'connecting'
+
+      let settled = false
+      const finish = (err?: Error) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutHandle)
+        if (err) {
+          this.state = 'error'
+          reject(err)
+        } else {
+          this.device = device
+          this.state = 'connected'
+          logger.info('printer.connected', {
+            name: device.name,
+            serviceId: this.serviceId,
+            characteristicId: this.characteristicId
+          })
+          resolve()
+        }
+      }
+
+      const timeoutHandle = setTimeout(
+        () => finish(new Error('蓝牙连接超时（8s）')),
+        CONNECT_DISCOVER_TIMEOUT_MS
+      )
+
       uni.createBLEConnection({
         deviceId: device.deviceId,
         success: () => {
-          this.device = device
-          this.state = 'connected'
-          logger.info('printer.connected', { name: device.name })
-          /* 简化：实际需 getBLEDeviceServices + getBLEDeviceCharacteristics 找可写特征值 */
-          resolve()
+          /* 步骤 2：发现 services */
+          uni.getBLEDeviceServices({
+            deviceId: device.deviceId,
+            success: (svcRes) => {
+              const services = (svcRes.services ?? []) as Array<{
+                uuid: string
+                isPrimary?: boolean
+              }>
+              if (services.length === 0) {
+                finish(new Error('未发现蓝牙 service'))
+                return
+              }
+              const primary = services.find((s) => s.isPrimary) ?? services[0]
+              const targetServiceId = primary.uuid
+              /* 步骤 3：发现 characteristics */
+              uni.getBLEDeviceCharacteristics({
+                deviceId: device.deviceId,
+                serviceId: targetServiceId,
+                success: (chRes) => {
+                  const chs = (chRes.characteristics ?? []) as Array<{
+                    uuid: string
+                    properties?: { write?: boolean; writeNoResponse?: boolean }
+                  }>
+                  const writable = chs.find(
+                    (c) => c.properties?.write === true || c.properties?.writeNoResponse === true
+                  )
+                  if (!writable) {
+                    finish(new Error('未发现可写 characteristic'))
+                    return
+                  }
+                  this.serviceId = targetServiceId
+                  this.characteristicId = writable.uuid
+                  finish()
+                },
+                fail: (e) => finish(new Error(e.errMsg ?? '获取特征值失败'))
+              })
+            },
+            fail: (e) => finish(new Error(e.errMsg ?? '获取 service 失败'))
+          })
         },
-        fail: (e) => {
-          this.state = 'error'
-          reject(new Error(e.errMsg ?? '蓝牙连接失败'))
-        }
+        fail: (e) => finish(new Error(e.errMsg ?? '蓝牙连接失败'))
       })
     })
   }
@@ -145,6 +218,8 @@ class BluetoothPrinter {
       if (!isBluetoothSupported()) {
         this.state = 'disconnected'
         this.device = null
+        this.serviceId = ''
+        this.characteristicId = ''
         resolve()
         return
       }
@@ -153,6 +228,8 @@ class BluetoothPrinter {
         complete: () => {
           this.state = 'disconnected'
           this.device = null
+          this.serviceId = ''
+          this.characteristicId = ''
           logger.info('printer.disconnected')
           resolve()
         }
@@ -163,7 +240,11 @@ class BluetoothPrinter {
   /** 打印订单（入队） */
   enqueue(task: PrintTask): void {
     this.queue.push(task)
-    logger.info('printer.enqueue', { id: task.id, queueLen: this.queue.length })
+    logger.info('printer.enqueue', {
+      id: task.id,
+      copies: task.copies,
+      queueLen: this.queue.length
+    })
     if (!this.processing) {
       void this.processQueue()
     }
@@ -178,7 +259,7 @@ class BluetoothPrinter {
       if (!task) break
       try {
         await this.doPrint(task)
-        logger.info('printer.print.ok', { id: task.id })
+        logger.info('printer.print.ok', { id: task.id, copies: task.copies })
       } catch (e) {
         logger.warn('printer.print.fail', { id: task.id, retry: task.retry, e: String(e) })
         if (task.retry < this.maxRetry) {
@@ -191,17 +272,50 @@ class BluetoothPrinter {
     this.processing = false
   }
 
-  /** 真正打印（ESC/POS 指令封装） */
-  private doPrint(task: PrintTask): Promise<void> {
+  /**
+   * 打印一个任务（R1 / I-02）
+   *
+   * 按 task.copies 循环 writeOnce()；每次之间间隔 PRINT_COPY_INTERVAL_MS 避免缓冲溢出。
+   * copies=10 → 触发 10 次 writeOnce，对应 V6.13 批量打印 10 张验收。
+   */
+  private async doPrint(task: PrintTask): Promise<void> {
+    if (this.state !== 'connected' || !this.device) {
+      throw new Error('打印机未连接')
+    }
+    const copies = Math.max(1, task.copies)
+    this.state = 'printing'
+    const buffer = this.buildEscPosBuffer(task)
+    try {
+      for (let i = 0; i < copies; i++) {
+        await this.writeOnce(buffer)
+        if (i < copies - 1) {
+          await new Promise((r) => setTimeout(r, PRINT_COPY_INTERVAL_MS))
+        }
+      }
+      this.state = 'connected'
+    } catch (e) {
+      this.state = 'error'
+      throw e
+    }
+  }
+
+  /**
+   * 单次写入（R1 / I-02 抽出）
+   *
+   * 调用前断言 serviceId/characteristicId 已就绪（防止 connect 中途异常未赋值）
+   */
+  private writeOnce(buffer: ArrayBuffer): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.state !== 'connected' || !this.device) {
+      if (!this.device) {
         reject(new Error('打印机未连接'))
         return
       }
-      this.state = 'printing'
-      const buffer = this.buildEscPosBuffer(task)
+      if (!this.serviceId || !this.characteristicId) {
+        reject(new Error('蓝牙特征值未就绪'))
+        return
+      }
       if (!isBluetoothSupported()) {
-        this.state = 'connected'
+        /* 非 APP 端走假设成功，便于 H5 / 小程序联调 */
         resolve()
         return
       }
@@ -212,14 +326,8 @@ class BluetoothPrinter {
         serviceId: this.serviceId,
         characteristicId: this.characteristicId,
         value: buffer as unknown as ArrayBuffer & number[],
-        success: () => {
-          this.state = 'connected'
-          resolve()
-        },
-        fail: (e) => {
-          this.state = 'error'
-          reject(new Error(e.errMsg ?? '写入失败'))
-        }
+        success: () => resolve(),
+        fail: (e) => reject(new Error(e.errMsg ?? '写入失败'))
       })
     })
   }

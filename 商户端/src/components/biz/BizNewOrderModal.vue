@@ -59,7 +59,7 @@
           <button class="nom-btn nom-btn--accept" @click="onAccept">立即接单</button>
         </view>
         <view class="nom-mute" @click="onToggleMute">
-          {{ muted ? '🔕 已静音本条' : '🔔 长按 2s 静音本条' }}
+          {{ muted ? '🔕 已静音本条' : '🔔 点击静音本条' }}
         </view>
       </view>
     </view>

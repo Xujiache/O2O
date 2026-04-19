@@ -6,9 +6,14 @@
  *
  * P5 经验教训：变量与 mixin 必须全部内联在本文件，禁止组件再 @import
  *               相对路径，避免嵌套页面注入失败（详见 P5_REPAIR_REPORT_R1）
+ *
+ * P6-R1 / I-06：@import → @use 'uview-plus/theme' as *
+ *   消除 Dart Sass 3.0 deprecation warning [import]
+ *   原指令「4 个 biz 组件 line 11」实为构建注入后的行号，
+ *   源码层仅 uni.scss line 11 一处 @import；改此处可消除全部组件警告
  */
 
-@import 'uview-plus/theme';
+@use 'uview-plus/theme' as *;
 
 /* ========== 商户端品牌色 ========== */
 $uni-color-primary: #2f80ed;

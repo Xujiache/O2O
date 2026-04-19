@@ -21,6 +21,8 @@ export const STORAGE_KEYS = {
   PRINTER_DEVICE: 'o2o_mchnt_printer_device',
   /** 极光推送 token */
   JPUSH_REG_ID: 'o2o_mchnt_jpush_reg_id',
+  /** 设备 ID（P6-R1 / I-05：替代 jpush.ts 内部硬编码字符串） */
+  DEVICE_ID: 'o2o_mchnt_device_id',
   /** 埋点离线缓冲（P5-REVIEW-01 R1 / I-10） */
   TRACK_BUFFER: 'o2o_mchnt_track_buffer'
 } as const

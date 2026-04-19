@@ -64,7 +64,7 @@ function detectPlatform(): 1 | 2 | 3 | 4 {
 
 /** 获取或生成设备 ID（持久化） */
 function getOrCreateDeviceId(): string {
-  const cached = getStorage<string>('o2o_mchnt_device_id')
+  const cached = getStorage<string>(STORAGE_KEYS.DEVICE_ID)
   if (cached) return cached
   let deviceId = ''
   try {
@@ -76,7 +76,7 @@ function getOrCreateDeviceId(): string {
   if (!deviceId) {
     deviceId = `mc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
   }
-  setStorage('o2o_mchnt_device_id', deviceId, 1000 * 60 * 60 * 24 * 365)
+  setStorage(STORAGE_KEYS.DEVICE_ID, deviceId, 1000 * 60 * 60 * 24 * 365)
   return deviceId
 }
 
@@ -129,7 +129,7 @@ export async function registerJPush(): Promise<string> {
 /** 注销当前设备 */
 export async function unregisterJPush(): Promise<void> {
   try {
-    const deviceId = getStorage<string>('o2o_mchnt_device_id')
+    const deviceId = getStorage<string>(STORAGE_KEYS.DEVICE_ID)
     if (!deviceId) return
     await post('/merchant/device/unregister', { deviceId }, { silent: true, retry: 1 })
     removeStorage(STORAGE_KEYS.JPUSH_REG_ID)
