@@ -1,6 +1,7 @@
 <template>
   <view class="order-list">
     <view class="placeholder">我的订单 — Sprint 3 实现（T7.17~T7.25）</view>
+    <BizDispatchModal />
   </view>
 </template>
 

@@ -1,6 +1,7 @@
 <template>
   <view class="wallet">
     <view class="placeholder">钱包概览 — Sprint 5 实现（T7.32~T7.35）</view>
+    <BizDispatchModal />
   </view>
 </template>
 

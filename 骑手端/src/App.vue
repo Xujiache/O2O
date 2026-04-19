@@ -2,7 +2,7 @@
   import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
   import { logger } from '@/utils/logger'
   import { initSentry, captureException } from '@/utils/sentry'
-  import { startWs, stopWs } from '@/utils/ws'
+  import { startWs, stopWs, ws as wsClient } from '@/utils/ws'
   import { onJPushNotificationClick, onJPushTransparentMessage } from '@/utils/jpush'
   import { useAuthStore } from '@/store/auth'
   import { useDispatchStore } from '@/store/dispatch'
@@ -44,6 +44,29 @@
     const auth = useAuthStore()
     auth.restore()
 
+    /* WS 订阅：所有骑手端 topic 统一接入 store handler */
+    const dispatch = useDispatchStore()
+    const order = useOrderStore()
+    const msg = useMsgStore()
+    const wallet = useWalletStore()
+    wsClient.subscribe<DispatchOrder>('rider:dispatch:new', (e) =>
+      dispatch.handleNewDispatch(e.data)
+    )
+    wsClient.subscribe<Partial<RiderOrder>>('rider:order:status:changed', (e) =>
+      order.handleStatusChanged(e.data)
+    )
+    wsClient.subscribe<Record<string, unknown>>('rider:order:abnormal:reply', (e) =>
+      msg.handleSystemEvent(e.topic, e.data)
+    )
+    wsClient.subscribe<Record<string, unknown>>('rider:transfer:result', (e) =>
+      msg.handleSystemEvent(e.topic, e.data)
+    )
+    wsClient.subscribe<Record<string, unknown>>('rider:emergency:ack', (e) =>
+      msg.handleSystemEvent(e.topic, e.data)
+    )
+    wsClient.subscribe('rider:wallet:balance:changed', () => wallet.refresh())
+    wsClient.subscribe<Message>('rider:message:new', (e) => msg.handleNewMessage(e.data))
+
     /* 已登录则启动 WS + 监听极光推送回调 */
     if (auth.isLoggedIn && auth.user?.id) {
       startWs(auth.user.id)
@@ -59,10 +82,6 @@
       const topic = payload?.topic as string | undefined
       const data = (payload?.data ?? payload) as unknown
       if (!topic) return
-      const dispatch = useDispatchStore()
-      const order = useOrderStore()
-      const msg = useMsgStore()
-      const wallet = useWalletStore()
       switch (topic) {
         case 'rider:dispatch:new':
           dispatch.handleNewDispatch(data as DispatchOrder)

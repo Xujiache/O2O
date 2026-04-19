@@ -57,6 +57,8 @@
     </view>
 
     <button class="logout" @click="onLogout">退出登录</button>
+
+    <BizDispatchModal />
   </view>
 </template>
 

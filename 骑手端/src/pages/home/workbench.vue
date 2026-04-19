@@ -91,6 +91,8 @@
         <view class="emergency__text">长按 3 秒紧急求助</view>
       </view>
     </view>
+
+    <BizDispatchModal />
   </view>
 </template>
 
