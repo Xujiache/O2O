@@ -79,6 +79,28 @@
         { "path": "abnormal", "style": { "navigationBarTitleText": "异常上报" } },
         { "path": "print-setting", "style": { "navigationBarTitleText": "打印设置" } }
       ]
+    },
+    {
+      "root": "pages-product",
+      "pages": [
+        { "path": "category", "style": { "navigationBarTitleText": "商品分类" } },
+        { "path": "edit", "style": { "navigationBarTitleText": "编辑商品" } },
+        { "path": "sku-edit", "style": { "navigationBarTitleText": "SKU 编辑" } },
+        { "path": "discount", "style": { "navigationBarTitleText": "限时折扣" } }
+      ]
+    },
+    {
+      "root": "pages-finance",
+      "pages": [
+        { "path": "bill-list", "style": { "navigationBarTitleText": "账单明细" } },
+        { "path": "withdraw", "style": { "navigationBarTitleText": "申请提现" } },
+        { "path": "withdraw-record", "style": { "navigationBarTitleText": "提现记录" } },
+        { "path": "bank-card", "style": { "navigationBarTitleText": "银行卡管理" } },
+        { "path": "bank-card-edit", "style": { "navigationBarTitleText": "添加银行卡" } },
+        { "path": "invoice-apply", "style": { "navigationBarTitleText": "申请发票" } },
+        { "path": "invoice-list", "style": { "navigationBarTitleText": "发票记录" } },
+        { "path": "invoice-header", "style": { "navigationBarTitleText": "发票抬头" } }
+      ]
     }
   ],
   "preloadRule": {
@@ -89,6 +111,14 @@
     "pages/order/index": {
       "network": "all",
       "packages": ["pages-order"]
+    },
+    "pages/product/index": {
+      "network": "all",
+      "packages": ["pages-product"]
+    },
+    "pages/finance/index": {
+      "network": "all",
+      "packages": ["pages-finance"]
     }
   },
   "globalStyle": {
