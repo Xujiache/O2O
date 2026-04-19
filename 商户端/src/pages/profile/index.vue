@@ -14,7 +14,34 @@
       </view>
     </view>
 
-    <!-- 入口列表 -->
+    <!-- 业务入口 -->
+    <view class="profile-menu">
+      <view class="profile-menu__item" @click="goStat">
+        <text class="profile-menu__icon">📊</text>
+        <text class="profile-menu__text">数据统计</text>
+        <text class="profile-menu__arrow">›</text>
+      </view>
+      <view class="profile-menu__item" @click="goMessage">
+        <text class="profile-menu__icon">📬</text>
+        <text class="profile-menu__text">消息中心</text>
+        <text v-if="msgStore.totalUnread > 0" class="profile-menu__badge">{{
+          msgStore.totalUnread
+        }}</text>
+        <text class="profile-menu__arrow">›</text>
+      </view>
+      <view class="profile-menu__item" @click="goCoupon">
+        <text class="profile-menu__icon">🎟️</text>
+        <text class="profile-menu__text">店铺券</text>
+        <text class="profile-menu__arrow">›</text>
+      </view>
+      <view class="profile-menu__item" @click="goPromotion">
+        <text class="profile-menu__icon">🎁</text>
+        <text class="profile-menu__text">营销活动</text>
+        <text class="profile-menu__arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 设置入口 -->
     <view class="profile-menu">
       <view class="profile-menu__item" @click="goSecurity">
         <text class="profile-menu__icon">🔒</text>
@@ -26,7 +53,12 @@
         <text class="profile-menu__text">通知设置</text>
         <text class="profile-menu__arrow">›</text>
       </view>
-      <view class="profile-menu__item" @click="goStaff">
+      <view class="profile-menu__item" @click="goPrintSetting">
+        <text class="profile-menu__icon">🖨️</text>
+        <text class="profile-menu__text">打印机设置</text>
+        <text class="profile-menu__arrow">›</text>
+      </view>
+      <view v-if="authStore.isMaster" class="profile-menu__item" @click="goStaff">
         <text class="profile-menu__icon">👥</text>
         <text class="profile-menu__text">子账号管理</text>
         <text class="profile-menu__arrow">›</text>
@@ -45,7 +77,7 @@
 
 <script setup lang="ts">
   import { computed } from 'vue'
-  import { useAuthStore, useAppStore } from '@/store'
+  import { useAuthStore, useAppStore, useMsgStore } from '@/store'
   import { logout as apiLogout } from '@/api/auth'
   import { mockEnabled, delay } from '@/api/_mock'
   import { logger } from '@/utils/logger'
@@ -60,6 +92,7 @@
    */
   const authStore = useAuthStore()
   const appStore = useAppStore()
+  const msgStore = useMsgStore()
 
   const avatarChar = computed<string>(() => {
     const name = authStore.profile?.contactName ?? ''
@@ -79,16 +112,31 @@
   }
 
   function goSecurity() {
-    uni.showToast({ title: 'S5 上线', icon: 'none' })
+    uni.navigateTo({ url: '/pages-setting/security' })
   }
   function goNotify() {
-    uni.showToast({ title: 'S5 上线', icon: 'none' })
+    uni.navigateTo({ url: '/pages-setting/notify' })
   }
   function goStaff() {
-    uni.showToast({ title: 'S5 上线', icon: 'none' })
+    uni.navigateTo({ url: '/pages-setting/staff-list' })
   }
   function goAbout() {
-    uni.showToast({ title: 'S5 上线', icon: 'none' })
+    uni.navigateTo({ url: '/pages-setting/about' })
+  }
+  function goPrintSetting() {
+    uni.navigateTo({ url: '/pages-order/print-setting' })
+  }
+  function goStat() {
+    uni.navigateTo({ url: '/pages-stat/index' })
+  }
+  function goMessage() {
+    uni.navigateTo({ url: '/pages-msg/index' })
+  }
+  function goCoupon() {
+    uni.navigateTo({ url: '/pages-marketing/coupon-list' })
+  }
+  function goPromotion() {
+    uni.navigateTo({ url: '/pages-marketing/promotion-list' })
   }
 
   async function onLogout() {
@@ -167,6 +215,7 @@
   }
 
   .profile-menu {
+    margin-bottom: 16rpx;
     background: #fff;
     border-radius: 16rpx;
 
@@ -191,6 +240,15 @@
       flex: 1;
       font-size: 28rpx;
       color: $uni-text-color;
+    }
+
+    &__badge {
+      padding: 0 12rpx;
+      margin-right: 8rpx;
+      font-size: 20rpx;
+      color: #fff;
+      background: $uni-color-error;
+      border-radius: 999rpx;
     }
 
     &__arrow {

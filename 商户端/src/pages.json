@@ -101,6 +101,36 @@
         { "path": "invoice-list", "style": { "navigationBarTitleText": "发票记录" } },
         { "path": "invoice-header", "style": { "navigationBarTitleText": "发票抬头" } }
       ]
+    },
+    {
+      "root": "pages-stat",
+      "pages": [{ "path": "index", "style": { "navigationBarTitleText": "数据统计" } }]
+    },
+    {
+      "root": "pages-msg",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "消息中心" } },
+        { "path": "detail", "style": { "navigationBarTitleText": "消息详情" } }
+      ]
+    },
+    {
+      "root": "pages-marketing",
+      "pages": [
+        { "path": "coupon-list", "style": { "navigationBarTitleText": "店铺券" } },
+        { "path": "coupon-edit", "style": { "navigationBarTitleText": "编辑店铺券" } },
+        { "path": "promotion-list", "style": { "navigationBarTitleText": "促销活动" } },
+        { "path": "promotion-edit", "style": { "navigationBarTitleText": "编辑活动" } }
+      ]
+    },
+    {
+      "root": "pages-setting",
+      "pages": [
+        { "path": "staff-list", "style": { "navigationBarTitleText": "子账号管理" } },
+        { "path": "staff-edit", "style": { "navigationBarTitleText": "编辑子账号" } },
+        { "path": "security", "style": { "navigationBarTitleText": "账号安全" } },
+        { "path": "notify", "style": { "navigationBarTitleText": "通知设置" } },
+        { "path": "about", "style": { "navigationBarTitleText": "关于" } }
+      ]
     }
   ],
   "preloadRule": {
