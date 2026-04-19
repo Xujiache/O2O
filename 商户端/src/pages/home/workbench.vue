@@ -1,9 +1,9 @@
 <template>
   <view class="page page-workbench">
-    <!-- 顶部商户信息 -->
+    <!-- 顶部商户卡 -->
     <view class="wb-header">
-      <view class="wb-shop">
-        <text class="wb-shop__name">{{ shopStore.currentShop?.name || '请选择店铺' }}</text>
+      <view class="row-between">
+        <BizShopSwitcher />
         <view
           class="wb-shop__status"
           :class="{
@@ -17,15 +17,15 @@
       <text class="wb-greet">您好，{{ authStore.profile?.contactName || '商户' }}</text>
     </view>
 
-    <!-- KPI 卡片（S2 完整对接，本期占位） -->
+    <!-- KPI 卡 -->
     <view class="wb-kpi">
       <view class="wb-kpi__cell">
         <text class="wb-kpi__num">{{ kpi.todayOrderCount }}</text>
         <text class="wb-kpi__label">今日订单</text>
       </view>
       <view class="wb-kpi__cell">
-        <text class="wb-kpi__num">¥{{ kpi.todayIncome }}</text>
-        <text class="wb-kpi__label">今日营收</text>
+        <text class="wb-kpi__num">{{ formatAmount(kpi.todayIncome, '') }}</text>
+        <text class="wb-kpi__label">今日营收 (元)</text>
       </view>
       <view class="wb-kpi__cell">
         <text class="wb-kpi__num">{{ kpi.pendingOrderCount }}</text>
@@ -37,30 +37,50 @@
       </view>
     </view>
 
-    <!-- 快捷入口（S2 实现） -->
+    <!-- 异常警示 -->
+    <view v-if="kpi.abnormalCount > 0" class="wb-alert" @click="goOrder">
+      <text>⚠ 当前 {{ kpi.abnormalCount }} 单异常待处理，点击查看</text>
+    </view>
+
+    <!-- 快捷入口 -->
     <view class="wb-section">
       <text class="wb-section__title">快捷操作</text>
       <view class="wb-quick">
-        <view class="wb-quick__item" @click="goShop">
+        <view class="wb-quick__item" @click="goShopEdit">
           <text class="wb-quick__icon">🏪</text>
-          <text>店铺管理</text>
+          <text>店铺信息</text>
         </view>
-        <view class="wb-quick__item" @click="goOrder">
-          <text class="wb-quick__icon">📋</text>
-          <text>订单管理</text>
+        <view class="wb-quick__item" @click="goBusinessHour">
+          <text class="wb-quick__icon">🕒</text>
+          <text>营业时间</text>
         </view>
-        <view class="wb-quick__item" @click="goProduct">
-          <text class="wb-quick__icon">🍱</text>
-          <text>商品管理</text>
+        <view class="wb-quick__item" @click="goDeliveryArea">
+          <text class="wb-quick__icon">📍</text>
+          <text>配送范围</text>
         </view>
-        <view class="wb-quick__item" @click="goFinance">
-          <text class="wb-quick__icon">💰</text>
-          <text>财务结算</text>
+        <view class="wb-quick__item" @click="goReview">
+          <text class="wb-quick__icon">💬</text>
+          <text>评价管理</text>
         </view>
       </view>
     </view>
 
-    <!-- 营业状态切换（S2 完整对接） -->
+    <!-- 评分曲线 -->
+    <view class="wb-section">
+      <view class="row-between">
+        <text class="wb-section__title">最近 30 天评分</text>
+        <text class="wb-section__more" @click="loadRating">刷新</text>
+      </view>
+      <BizStatChart
+        :data="ratingPoints"
+        :loading="ratingLoading"
+        emptyText="暂无评分数据"
+        :y-min="0"
+        :y-max="5"
+      />
+    </view>
+
+    <!-- 营业状态切换 -->
     <view class="wb-section wb-section--card">
       <view class="row-between">
         <view>
@@ -69,6 +89,14 @@
         </view>
         <switch :checked="shopStore.isOpen" color="#2F80ED" @change="onToggleOpen" />
       </view>
+      <BizBtn
+        v-if="!shopStore.isOpen"
+        type="warning"
+        text="临时歇业"
+        block
+        style="margin-top: 16rpx"
+        @click="onTempClose"
+      />
     </view>
 
     <!-- 自动接单 -->
@@ -76,35 +104,63 @@
       <view class="row-between">
         <view>
           <text class="wb-section__title">自动接单</text>
-          <text class="wb-section__sub">开启后新订单自动接单（5 秒倒计时）</text>
+          <text class="wb-section__sub">开启后新订单 5 秒倒计时自动接单</text>
         </view>
         <switch :checked="shopStore.autoAccept" color="#2F80ED" @change="onToggleAutoAccept" />
       </view>
     </view>
 
-    <view class="wb-tip">完整 KPI / 评分曲线 / 快捷入口将在 Sprint 2 上线</view>
+    <!-- 临时歇业弹层 -->
+    <BizDialog
+      v-model:show="tempCloseVisible"
+      title="临时歇业"
+      content="选择歇业时长，到期自动恢复营业"
+      :show-cancel="true"
+      confirm-text="确认歇业"
+      @confirm="onConfirmTempClose"
+    >
+      <view class="temp-close">
+        <view
+          v-for="opt in tempCloseOptions"
+          :key="opt.label"
+          class="temp-close__opt"
+          :class="{ 'temp-close__opt--active': tempCloseHours === opt.hours }"
+          @click="tempCloseHours = opt.hours"
+        >
+          {{ opt.label }}
+        </view>
+      </view>
+    </BizDialog>
   </view>
 </template>
 
 <script setup lang="ts">
-  import { reactive, onMounted } from 'vue'
+  import { reactive, ref, onMounted } from 'vue'
   import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
   import { useAuthStore, useShopStore } from '@/store'
   import { mockEnabled, mockShops, delay } from '@/api/_mock'
-  import { listMyShops } from '@/api/shop'
+  import {
+    listMyShops,
+    getWorkbenchKpi,
+    getRatingTrend,
+    toggleShopOpen,
+    toggleAutoAccept
+  } from '@/api/shop'
   import { logger } from '@/utils/logger'
   import { track, TRACK } from '@/utils/track'
+  import { formatAmount } from '@/utils/format'
 
   /**
-   * 工作台首页（tabBar）
+   * 工作台首页（tabBar 1）
    *
-   * 本期（S1）实现：
-   *   - 商户信息展示
-   *   - KPI 占位（mock 数据）
-   *   - 快捷入口（占位跳转 tabBar）
-   *   - 营业状态切换 / 自动接单切换（本地态）
-   *
-   * S2 完成：真实 KPI / 评分曲线 / 真实店铺切换
+   * 本期（S2）实现：
+   *   - 真实 KPI 卡（今日订单/营收/待处理/评分）
+   *   - 评分曲线（最近 30 天）
+   *   - 店铺切换器（BizShopSwitcher）
+   *   - 营业状态切换（带二次确认）+ 临时歇业（多档时长）
+   *   - 自动接单切换
+   *   - 4 个快捷入口（店铺信息 / 营业时间 / 配送范围 / 评价管理）
+   *   - 异常订单警示条（直跳订单页）
    *
    * @author 单 Agent V2.0 (P6 商户端 / T6.10-T6.11)
    */
@@ -115,20 +171,42 @@
     todayOrderCount: 0,
     todayIncome: '0.00',
     pendingOrderCount: 0,
-    scoreAvg: '0.0'
+    scoreAvg: '0.0',
+    monthOrderCount: 0,
+    monthIncome: '0.00',
+    abnormalCount: 0
   })
+
+  const ratingPoints = ref<{ label: string; value: number }[]>([])
+  const ratingLoading = ref<boolean>(false)
+
+  /** 临时歇业弹层 */
+  const tempCloseVisible = ref<boolean>(false)
+  const tempCloseHours = ref<number>(2)
+  const tempCloseOptions = [
+    { label: '1 小时', hours: 1 },
+    { label: '2 小时', hours: 2 },
+    { label: '4 小时', hours: 4 },
+    { label: '至明日 9 点', hours: -1 }
+  ]
 
   onMounted(async () => {
     track(TRACK.VIEW_WORKBENCH)
     await loadShops()
+    await loadKpi()
+    await loadRating()
   })
 
-  onShow(() => {
-    /* 返回 tabBar 时刷新 KPI */
+  onShow(async () => {
+    if (shopStore.currentShopId) {
+      await loadKpi()
+    }
   })
 
   onPullDownRefresh(async () => {
     await loadShops()
+    await loadKpi()
+    await loadRating()
     uni.stopPullDownRefresh()
   })
 
@@ -141,31 +219,142 @@
     }
   }
 
-  /** uni-app switch 事件兼容 vue-tsc：参数声明为 unknown 再断言 */
+  async function loadKpi() {
+    if (!shopStore.currentShopId) return
+    try {
+      if (mockEnabled()) {
+        const r = await delay({
+          todayOrderCount: 12,
+          todayIncome: '786.30',
+          pendingOrderCount: 3,
+          scoreAvg: '4.8',
+          monthOrderCount: 320,
+          monthIncome: '23456.80',
+          abnormalCount: 0
+        })
+        Object.assign(kpi, r)
+      } else {
+        const r = await getWorkbenchKpi(shopStore.currentShopId)
+        Object.assign(kpi, r)
+      }
+    } catch (e) {
+      logger.warn('workbench.loadKpi.fail', { e: String(e) })
+    }
+  }
+
+  async function loadRating() {
+    if (!shopStore.currentShopId) return
+    ratingLoading.value = true
+    try {
+      const list = mockEnabled()
+        ? await delay(genMockRating())
+        : await getRatingTrend(shopStore.currentShopId, 30)
+      ratingPoints.value = list.map((p) => ({ label: p.date.slice(5), value: p.score }))
+    } catch (e) {
+      logger.warn('workbench.loadRating.fail', { e: String(e) })
+    } finally {
+      ratingLoading.value = false
+    }
+  }
+
+  function genMockRating() {
+    const r: { date: string; score: number }[] = []
+    const today = new Date()
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today.getTime() - i * 86400000)
+      r.push({
+        date: d.toISOString().slice(0, 10),
+        score: 4 + Math.random() * 1
+      })
+    }
+    return r
+  }
+
   function onToggleOpen(e: unknown) {
     const v = (e as { detail?: { value?: boolean } })?.detail?.value ?? false
-    shopStore.toggleOpen(v ? 1 : 0)
-    uni.showToast({ title: v ? '已开启营业' : '已歇业', icon: 'success' })
+    if (!shopStore.currentShopId) {
+      uni.showToast({ title: '请先选择店铺', icon: 'none' })
+      return
+    }
+    uni.showModal({
+      title: v ? '开启营业' : '关闭营业',
+      content: v ? '开启后用户可下单，确认开启吗？' : '关闭后用户将无法下单，确认关闭吗？',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          if (!mockEnabled()) {
+            await toggleShopOpen(shopStore.currentShopId, { isOpen: v ? 1 : 0 })
+          }
+          shopStore.toggleOpen(v ? 1 : 0)
+          track(TRACK.TOGGLE_SHOP_OPEN, { isOpen: v ? 1 : 0 })
+          uni.showToast({ title: v ? '已开启营业' : '已歇业', icon: 'success' })
+        } catch (err) {
+          logger.warn('workbench.toggleOpen.fail', { e: String(err) })
+        }
+      }
+    })
   }
 
-  function onToggleAutoAccept(e: unknown) {
+  async function onToggleAutoAccept(e: unknown) {
     const v = (e as { detail?: { value?: boolean } })?.detail?.value ?? false
-    shopStore.toggleAutoAccept(v ? 1 : 0)
-    uni.showToast({ title: v ? '已开启自动接单' : '已关闭自动接单', icon: 'success' })
+    try {
+      if (!mockEnabled()) {
+        await toggleAutoAccept(shopStore.currentShopId, v ? 1 : 0)
+      }
+      shopStore.toggleAutoAccept(v ? 1 : 0)
+      track(v ? TRACK.CLICK_AUTO_ACCEPT_ON : TRACK.CLICK_AUTO_ACCEPT_OFF)
+      uni.showToast({ title: v ? '已开启自动接单' : '已关闭自动接单', icon: 'success' })
+    } catch (err) {
+      logger.warn('workbench.toggleAutoAccept.fail', { e: String(err) })
+    }
   }
 
-  function goShop() {
-    /* S2 实现店铺管理 tabBar */
-    uni.showToast({ title: 'S2 上线', icon: 'none' })
+  function onTempClose() {
+    tempCloseVisible.value = true
+  }
+
+  async function onConfirmTempClose() {
+    try {
+      const tempCloseUntil =
+        tempCloseHours.value === -1
+          ? nextDay9amISO()
+          : new Date(Date.now() + tempCloseHours.value * 3600 * 1000).toISOString()
+      if (!mockEnabled()) {
+        await toggleShopOpen(shopStore.currentShopId, {
+          isOpen: 2,
+          tempCloseReason: '临时歇业',
+          tempCloseUntil
+        })
+      }
+      shopStore.toggleOpen(2)
+      shopStore.updateCurrentShop({ tempCloseUntil, tempCloseReason: '临时歇业' })
+      uni.showToast({ title: '已临时歇业', icon: 'success' })
+    } catch (err) {
+      logger.warn('workbench.tempClose.fail', { e: String(err) })
+    }
+  }
+
+  function nextDay9amISO(): string {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(9, 0, 0, 0)
+    return d.toISOString()
+  }
+
+  function goShopEdit() {
+    uni.navigateTo({ url: '/pages-shop/edit' })
+  }
+  function goBusinessHour() {
+    uni.navigateTo({ url: '/pages-shop/business-hour' })
+  }
+  function goDeliveryArea() {
+    uni.navigateTo({ url: '/pages-shop/delivery-area' })
+  }
+  function goReview() {
+    uni.navigateTo({ url: '/pages-shop/review-list' })
   }
   function goOrder() {
     uni.switchTab({ url: '/pages/order/index' })
-  }
-  function goProduct() {
-    uni.switchTab({ url: '/pages/product/index' })
-  }
-  function goFinance() {
-    uni.switchTab({ url: '/pages/finance/index' })
   }
 </script>
 
@@ -184,29 +373,14 @@
     border-radius: 16rpx;
   }
 
-  .wb-shop {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .wb-shop__status {
+    padding: 4rpx 16rpx;
+    font-size: 22rpx;
+    background: rgb(255 255 255 / 22%);
+    border-radius: 999rpx;
 
-    &__name {
-      font-size: 32rpx;
-      font-weight: 600;
-    }
-
-    &__status {
-      padding: 4rpx 16rpx;
-      font-size: 22rpx;
-      background: rgb(255 255 255 / 22%);
-      border-radius: 999rpx;
-
-      &--open {
-        background: rgb(82 196 26 / 30%);
-      }
-
-      &--close {
-        background: rgb(255 255 255 / 22%);
-      }
+    &--open {
+      background: rgb(82 196 26 / 30%);
     }
   }
 
@@ -215,6 +389,16 @@
     margin-top: 16rpx;
     font-size: 24rpx;
     opacity: 0.85;
+  }
+
+  .wb-alert {
+    padding: 16rpx 24rpx;
+    margin-bottom: 24rpx;
+    font-size: 24rpx;
+    color: $uni-color-error;
+    background: rgb(255 77 79 / 8%);
+    border-left: 6rpx solid $uni-color-error;
+    border-radius: 8rpx;
   }
 
   .wb-kpi {
@@ -267,6 +451,11 @@
       font-size: 22rpx;
       color: $uni-text-color-grey;
     }
+
+    &__more {
+      font-size: 22rpx;
+      color: $uni-color-primary;
+    }
   }
 
   .wb-quick {
@@ -290,10 +479,26 @@
     }
   }
 
-  .wb-tip {
-    padding: 24rpx;
-    font-size: 22rpx;
-    color: $uni-text-color-placeholder;
-    text-align: center;
+  .temp-close {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16rpx;
+    padding: 16rpx 0;
+
+    &__opt {
+      padding: 24rpx;
+      font-size: 26rpx;
+      color: $uni-text-color;
+      text-align: center;
+      background: $uni-bg-color-grey;
+      border: 2rpx solid transparent;
+      border-radius: 12rpx;
+
+      &--active {
+        color: $uni-color-primary;
+        background: $uni-color-primary-light;
+        border-color: $uni-color-primary;
+      }
+    }
   }
 </style>

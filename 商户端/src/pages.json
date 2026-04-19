@@ -58,8 +58,26 @@
         { "path": "reset-password", "style": { "navigationBarTitleText": "重置密码" } },
         { "path": "agreement", "style": { "navigationBarTitleText": "用户协议" } }
       ]
+    },
+    {
+      "root": "pages-shop",
+      "pages": [
+        { "path": "edit", "style": { "navigationBarTitleText": "店铺信息" } },
+        { "path": "business-hour", "style": { "navigationBarTitleText": "营业时间" } },
+        { "path": "delivery-area", "style": { "navigationBarTitleText": "配送范围" } },
+        { "path": "delivery-config", "style": { "navigationBarTitleText": "配送设置" } },
+        { "path": "review-list", "style": { "navigationBarTitleText": "评价管理" } },
+        { "path": "review-reply", "style": { "navigationBarTitleText": "回复评价" } },
+        { "path": "review-appeal", "style": { "navigationBarTitleText": "申诉评价" } }
+      ]
     }
   ],
+  "preloadRule": {
+    "pages/home/workbench": {
+      "network": "all",
+      "packages": ["pages-shop"]
+    }
+  },
   "globalStyle": {
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "O2O 商户端",
