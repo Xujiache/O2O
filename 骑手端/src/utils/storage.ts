@@ -42,7 +42,9 @@ export const STORAGE_KEYS = {
   /** 默认电话脱敏中转配置 */
   CALL_RELAY: 'o2o_rider_call_relay',
   /** 取件码错误次数（防爆破） */
-  PICKUP_ERROR_COUNT: 'o2o_rider_pickup_error_count'
+  PICKUP_ERROR_COUNT: 'o2o_rider_pickup_error_count',
+  /** 骑手登录后辅助状态：保证金已交标记 + 健康证有效期 */
+  AUTH_EXTRA: 'o2o_rider_auth_extra'
 } as const
 
 interface StorageEntry<T> {

@@ -68,7 +68,7 @@ export const useAuthStore = defineStore(
         setSentryUser({ id: u.id, riderNo: u.riderNo })
       }
       const ws = getStorage<{ depositPaid: boolean; healthCertExpireAt: string | null }>(
-        'o2o_rider_auth_extra'
+        STORAGE_KEYS.AUTH_EXTRA
       )
       if (ws) {
         depositPaid.value = ws.depositPaid
@@ -96,7 +96,7 @@ export const useAuthStore = defineStore(
       setStorage(STORAGE_KEYS.REFRESH_TOKEN, payload.refreshToken, 1000 * 60 * 60 * 24 * 30)
       setStorage(STORAGE_KEYS.USER_INFO, payload.user, 1000 * 60 * 60 * 24 * 30)
       setStorage(
-        'o2o_rider_auth_extra',
+        STORAGE_KEYS.AUTH_EXTRA,
         {
           depositPaid: depositPaid.value,
           healthCertExpireAt: healthCertExpireAt.value
@@ -128,7 +128,7 @@ export const useAuthStore = defineStore(
     function setDepositPaid(paid: boolean) {
       depositPaid.value = paid
       setStorage(
-        'o2o_rider_auth_extra',
+        STORAGE_KEYS.AUTH_EXTRA,
         {
           depositPaid: depositPaid.value,
           healthCertExpireAt: healthCertExpireAt.value
@@ -141,7 +141,7 @@ export const useAuthStore = defineStore(
     function setHealthCertExpireAt(expireAt: string | null) {
       healthCertExpireAt.value = expireAt
       setStorage(
-        'o2o_rider_auth_extra',
+        STORAGE_KEYS.AUTH_EXTRA,
         {
           depositPaid: depositPaid.value,
           healthCertExpireAt: healthCertExpireAt.value
@@ -173,7 +173,7 @@ export const useAuthStore = defineStore(
       removeStorage(STORAGE_KEYS.REFRESH_TOKEN)
       removeStorage(STORAGE_KEYS.USER_INFO)
       removeStorage(STORAGE_KEYS.WORK_STATUS)
-      removeStorage('o2o_rider_auth_extra')
+      removeStorage(STORAGE_KEYS.AUTH_EXTRA)
       removeStorage(STORAGE_KEYS.JPUSH_REG_ID)
       try {
         uni.removeStorageSync('o2o_rider_auth')

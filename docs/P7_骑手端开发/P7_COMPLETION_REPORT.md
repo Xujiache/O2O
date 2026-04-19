@@ -274,7 +274,7 @@ sendEnvelope → uni.request POST /api/${pid}/envelope/
 | 5 | **P6/I-02 批量字段不真消费** | ✅ LocationBatch.points 服务端真循环（切片 100/批，本期注释明确"P6-R1 / I-02 教训"） |
 | 6 | **P6/I-03 静态资源不创建占位** | ✅ silent.wav 45B 真有效 / new-dispatch.mp3 0B + audioCtx.onError 兜底 / marker 3 张 67B 真 PNG / static/README.md 详记 P9 真资源命令 |
 | 7 | **P6/I-04 文案↔代码↔JSDoc 三方不一致** | ✅ DispatchModal "🔔 点击静音本条" / mute 切换 / JSDoc"P6-R1 / I-04 教训"明确标注 |
-| 8 | **P6/I-05 STORAGE_KEYS 硬编码** | ✅ 17 个 STORAGE_KEYS 集中管理（含 LOCATION_OFFLINE_QUEUE / NAV_VENDOR / PICKUP_ERROR_COUNT 等本期新增） |
+| 8 | **P6/I-05 STORAGE_KEYS 硬编码** | ✅ 18 个 STORAGE_KEYS 集中管理（含 LOCATION_OFFLINE_QUEUE / NAV_VENDOR / PICKUP_ERROR_COUNT / AUTH_EXTRA 等本期新增）；R2 闭环：R1 时仍残 5 处 `auth_extra` 硬编码，R2 已全部走 `STORAGE_KEYS.AUTH_EXTRA` |
 | 9 | **P6/I-06 Sass @import 弃用** | ✅ uni.scss 用 `@use 'uview-plus/theme' as *` |
 | 10 | **P6/I-07 onShow 频繁刷新** | ✅ order store refreshIfStale 5min 节流 / dispatch hall 5s 节流 / wallet 写时刷新 |
 
@@ -398,3 +398,55 @@ node 骑手端/scripts/kalman-test.mjs   7 passed, 0 failed (V7.19)
 
 > R1 修复 1/1 已闭环，等待用户复审。
 > 完成报告 §十二 "10 项 P5/P6 教训规避"中第 6 项（P6/I-03 静态资源不创建占位）由"🟡 部分"升至"✅ 完整"。
+
+---
+
+## 十五、R2 修复记录（2026-04-19）
+
+> **触发**：P7-REVIEW-02 完整回归测试发现 R-03（前一轮漏审）
+> **执行**：单 Agent V2.0；1 个 commit + push；4 项门禁全过；不破坏其它已通过代码
+> **审查报告**：`docs/P7_骑手端开发/P7_REVIEW_02.md`
+
+### R-03 [P2 必修] auth.ts 5 处硬编码 `'o2o_rider_auth_extra'` → `STORAGE_KEYS.AUTH_EXTRA`
+
+| 维度 | 修复前 | 修复后 |
+|---|---|---|
+| `骑手端/src/utils/storage.ts` STORAGE_KEYS | 17 项，缺 AUTH_EXTRA | 18 项，新增 `AUTH_EXTRA: 'o2o_rider_auth_extra'` |
+| `骑手端/src/store/auth.ts` line 71 | `getStorage<...>('o2o_rider_auth_extra')` | `getStorage<...>(STORAGE_KEYS.AUTH_EXTRA)` |
+| `骑手端/src/store/auth.ts` line 99 | `setStorage('o2o_rider_auth_extra', ...)` | `setStorage(STORAGE_KEYS.AUTH_EXTRA, ...)` |
+| `骑手端/src/store/auth.ts` line 131 | `setStorage('o2o_rider_auth_extra', ...)` | `setStorage(STORAGE_KEYS.AUTH_EXTRA, ...)` |
+| `骑手端/src/store/auth.ts` line 144 | `setStorage('o2o_rider_auth_extra', ...)` | `setStorage(STORAGE_KEYS.AUTH_EXTRA, ...)` |
+| `骑手端/src/store/auth.ts` line 176 | `removeStorage('o2o_rider_auth_extra')` | `removeStorage(STORAGE_KEYS.AUTH_EXTRA)` |
+| 反向 grep 残留硬编码 | 5 处 | 0 处（仅 storage.ts 常量定义 1 处） |
+| §十 #8 (P6/I-05) 自报 | "10/10 ✅"（失实，实为 9/10） | 勘误为 R2 闭环 |
+
+**漏审原因分析**：
+- R1 审查仅做正向 grep（`STORAGE_KEYS` 覆盖了什么），未做反向 grep（`getStorage\('o2o_rider`/`setStorage\('o2o_rider`/`removeStorage\('o2o_rider` 是否还有未走 STORAGE_KEYS 的硬编码）
+- R2 完整回归补上反向 grep 后发现本问题
+
+**工作流改进**：
+- 从 P8 起，禁忌项扫描必须**双向 grep**入库为强制清单
+- 正向：STORAGE_KEYS 覆盖检查
+- 反向：`getStorage\('o2o_|setStorage\('o2o_|removeStorage\('o2o_` 残留检查
+
+### 未触碰项
+
+- `'o2o_rider_auth'`（line 179/199）：pinia persist 框架 key（line 229-230 `persist: { key: 'o2o_rider_auth' }`），框架约定非 P6/I-05 同款，可选优化归 P9
+- R-01 已闭环代码（mp3 / scripts/gen-min-mp3.mjs / static/README.md）
+- 其它已通过模块
+
+### R2 自验收
+
+| 检查 | 结果 |
+|---|---|
+| 反向 grep `'o2o_rider_auth_extra'` 残留 | ✅ 仅 storage.ts 常量定义 1 处 |
+| `pnpm lint:check --max-warnings 0` | ✅ Exit 0 |
+| `pnpm lint:stylelint:check` | ✅ Exit 0 |
+| `pnpm type-check` | ✅ Exit 0 |
+| `pnpm build:h5` | ✅ Exit 0 + DONE Build complete |
+
+### R2 commit
+
+`fix(骑手端): P7-R2 修复 — auth_extra 5 处硬编码走 STORAGE_KEYS（R-03）`
+
+> R2 修复完成，请复审。
