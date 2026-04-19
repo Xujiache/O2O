@@ -90,6 +90,8 @@ src/types/import/components.d.ts
 
 # IDE 自动产物（sessionId 每次重启变化，不应入库）
 .cursor/mcp.json
+# IDE 插件自动生成的 rule（如 my-mcp，每次启用后会自动写入）
+.cursor/rules/*.mdc
 
 # Lint 临时输出（任意子目录）
 lint_output.txt
