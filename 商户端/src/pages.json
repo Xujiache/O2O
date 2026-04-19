@@ -70,12 +70,25 @@
         { "path": "review-reply", "style": { "navigationBarTitleText": "回复评价" } },
         { "path": "review-appeal", "style": { "navigationBarTitleText": "申诉评价" } }
       ]
+    },
+    {
+      "root": "pages-order",
+      "pages": [
+        { "path": "detail", "style": { "navigationBarTitleText": "订单详情" } },
+        { "path": "refund-audit", "style": { "navigationBarTitleText": "退款审核" } },
+        { "path": "abnormal", "style": { "navigationBarTitleText": "异常上报" } },
+        { "path": "print-setting", "style": { "navigationBarTitleText": "打印设置" } }
+      ]
     }
   ],
   "preloadRule": {
     "pages/home/workbench": {
       "network": "all",
-      "packages": ["pages-shop"]
+      "packages": ["pages-shop", "pages-order"]
+    },
+    "pages/order/index": {
+      "network": "all",
+      "packages": ["pages-order"]
     }
   },
   "globalStyle": {
