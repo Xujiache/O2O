@@ -47,6 +47,7 @@ function emptyTab(): TabState {
 
 /** 订单 Store */
 export const useOrderStore = defineStore('order', () => {
+  const currentTab = ref<RiderOrderTab>('pending')
   const tabs = ref<Record<RiderOrderTab, TabState>>({
     pending: emptyTab(),
     picking: emptyTab(),
@@ -264,6 +265,7 @@ export const useOrderStore = defineStore('order', () => {
   }
 
   return {
+    currentTab,
     tabs,
     tabCounts,
     detailCache,
