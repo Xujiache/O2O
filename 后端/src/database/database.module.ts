@@ -1,7 +1,18 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { D1_ENTITIES, D10_SYSTEM_ENTITIES } from '@/entities'
+import {
+  D1_ENTITIES,
+  D2_REGION_ENTITIES,
+  D3_SHOP_PRODUCT_ENTITIES,
+  D4_ORDER_GLOBAL_ENTITIES,
+  D5_FINANCE_ENTITIES,
+  D6_DISPATCH_ENTITIES,
+  D7_MARKETING_ENTITIES,
+  D8_REVIEW_ENTITIES,
+  D9_MESSAGE_ENTITIES,
+  D10_SYSTEM_ENTITIES
+} from '@/entities'
 
 /**
  * 数据库模块
@@ -28,7 +39,18 @@ import { D1_ENTITIES, D10_SYSTEM_ENTITIES } from '@/entities'
         logging: config.get<boolean>('db.logging'),
         timezone: '+08:00',
         charset: 'utf8mb4',
-        entities: [...D1_ENTITIES, ...D10_SYSTEM_ENTITIES],
+        entities: [
+          ...D1_ENTITIES,
+          ...D10_SYSTEM_ENTITIES,
+          ...D9_MESSAGE_ENTITIES,
+          ...D2_REGION_ENTITIES,
+          ...D3_SHOP_PRODUCT_ENTITIES,
+          ...D7_MARKETING_ENTITIES,
+          ...D4_ORDER_GLOBAL_ENTITIES,
+          ...D5_FINANCE_ENTITIES,
+          ...D6_DISPATCH_ENTITIES,
+          ...D8_REVIEW_ENTITIES
+        ],
         autoLoadEntities: true
       })
     })

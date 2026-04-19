@@ -30,6 +30,41 @@ export const BizErrorCode = {
   BIZ_OPERATION_FORBIDDEN: 10012,
   BIZ_STATE_INVALID: 10013,
 
+  /* ===== 101xx 商品与配送（DESIGN_P4 §十一）===== */
+  BIZ_DELIVERY_OUT_OF_RANGE: 10101 /* 配送范围外 */,
+  BIZ_BELOW_MIN_ORDER_AMOUNT: 10102 /* 低于起送价 */,
+
+  /* ===== 102xx 库存与商品状态 ===== */
+  BIZ_STOCK_INSUFFICIENT: 10200 /* 库存不足 */,
+  BIZ_PRODUCT_OFFLINE: 10201 /* 商品已下架 */,
+  BIZ_SHOP_CLOSED: 10202 /* 店铺打烊 */,
+
+  /* ===== 103xx 订单 ===== */
+  BIZ_ORDER_NOT_FOUND: 10300 /* 订单不存在 */,
+  BIZ_ORDER_STATE_NOT_ALLOWED: 10301 /* 状态不允许该操作 */,
+  BIZ_ORDER_NOT_OWNED: 10302 /* 非本人订单 */,
+
+  /* ===== 104xx 支付 ===== */
+  BIZ_PAYMENT_FAILED: 10400 /* 支付失败 */,
+  BIZ_PAYMENT_DUPLICATED: 10401 /* 重复支付 */,
+  BIZ_BALANCE_INSUFFICIENT: 10402 /* 余额不足 */,
+
+  /* ===== 105xx 退款 ===== */
+  BIZ_REFUND_FAILED: 10500 /* 退款失败 */,
+  BIZ_REFUND_OVER_LIMIT: 10501 /* 超出可退额 */,
+
+  /* ===== 106xx 派单 ===== */
+  BIZ_NO_AVAILABLE_RIDER: 10600 /* 无可派骑手 */,
+  BIZ_DISPATCH_TIMEOUT: 10601 /* 派单超时 */,
+
+  /* ===== 107xx 优惠券 ===== */
+  BIZ_COUPON_NOT_APPLICABLE: 10700 /* 优惠券不适用 */,
+  BIZ_COUPON_USED: 10701 /* 已使用 */,
+  BIZ_COUPON_EXPIRED: 10702 /* 已过期 */,
+
+  /* ===== 108xx 评价与售后 ===== */
+  BIZ_REVIEW_OUT_OF_PERIOD: 10800 /* 评价不在有效期 */,
+
   /* ======== 20xxx 认证 / 权限 ======== */
   AUTH_TOKEN_MISSING: 20001,
   AUTH_TOKEN_INVALID: 20002,
@@ -87,6 +122,33 @@ export const BizErrorMessage: Record<number, string> = {
   [BizErrorCode.BIZ_DATA_CONFLICT]: '数据冲突',
   [BizErrorCode.BIZ_OPERATION_FORBIDDEN]: '当前业务状态禁止该操作',
   [BizErrorCode.BIZ_STATE_INVALID]: '业务状态非法',
+
+  [BizErrorCode.BIZ_DELIVERY_OUT_OF_RANGE]: '超出配送范围',
+  [BizErrorCode.BIZ_BELOW_MIN_ORDER_AMOUNT]: '订单未达起送价',
+
+  [BizErrorCode.BIZ_STOCK_INSUFFICIENT]: '库存不足',
+  [BizErrorCode.BIZ_PRODUCT_OFFLINE]: '商品已下架',
+  [BizErrorCode.BIZ_SHOP_CLOSED]: '店铺已打烊',
+
+  [BizErrorCode.BIZ_ORDER_NOT_FOUND]: '订单不存在',
+  [BizErrorCode.BIZ_ORDER_STATE_NOT_ALLOWED]: '当前订单状态不允许该操作',
+  [BizErrorCode.BIZ_ORDER_NOT_OWNED]: '非本人订单',
+
+  [BizErrorCode.BIZ_PAYMENT_FAILED]: '支付失败',
+  [BizErrorCode.BIZ_PAYMENT_DUPLICATED]: '请勿重复支付',
+  [BizErrorCode.BIZ_BALANCE_INSUFFICIENT]: '账户余额不足',
+
+  [BizErrorCode.BIZ_REFUND_FAILED]: '退款失败',
+  [BizErrorCode.BIZ_REFUND_OVER_LIMIT]: '退款金额超出可退余额',
+
+  [BizErrorCode.BIZ_NO_AVAILABLE_RIDER]: '附近暂无可派骑手',
+  [BizErrorCode.BIZ_DISPATCH_TIMEOUT]: '派单超时',
+
+  [BizErrorCode.BIZ_COUPON_NOT_APPLICABLE]: '优惠券不适用',
+  [BizErrorCode.BIZ_COUPON_USED]: '优惠券已使用',
+  [BizErrorCode.BIZ_COUPON_EXPIRED]: '优惠券已过期',
+
+  [BizErrorCode.BIZ_REVIEW_OUT_OF_PERIOD]: '评价不在有效期内',
 
   [BizErrorCode.AUTH_TOKEN_MISSING]: '未登录或缺少令牌',
   [BizErrorCode.AUTH_TOKEN_INVALID]: '令牌无效',

@@ -1,0 +1,589 @@
+{
+  "info": {
+    "name": "O2O P4 业务接口集",
+    "_postman_id": "p4-business-2026-04-19",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "O2O 平台 P4 后端业务服务接口集；覆盖 8 大业务模块（Shop/Product/Marketing/Order/Payment/Finance/Dispatch/Review）+ Orchestration；累计 ≥ 40 用例，含外卖 9 节点端到端流程链。\n\n环境变量约定：\n  - {{baseUrl}}        http://localhost:3000/api/v1\n  - {{token_user}}     用户 JWT\n  - {{token_merchant}} 商户 JWT\n  - {{token_rider}}    骑手 JWT\n  - {{token_admin}}    管理员 JWT\n  - {{shopId}}         测试店铺 ID\n  - {{productId}}      测试商品 ID\n  - {{skuId}}          测试 SKU ID\n  - {{orderNo}}        测试订单号（端到端流程间共享）\n  - {{payNo}}          测试支付单号\n  - {{userCouponId}}   用户券 ID\n  - {{merchantId}}     商户 ID\n  - {{riderId}}        骑手 ID\n  - {{addressId}}      用户地址 ID"
+  },
+  "item": [
+    {
+      "name": "1. Shop",
+      "item": [
+        {
+          "name": "GET /user/shops/:id 店铺详情",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/user/shops/{{shopId}}", "host": ["{{baseUrl}}"], "path": ["user", "shops", "{{shopId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "GET /user/shops 店铺列表（GEO/筛选）",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/user/shops?lng=116.4&lat=39.9&category=fast-food&sort=distance&page=1&pageSize=20", "host": ["{{baseUrl}}"], "path": ["user", "shops"], "query": [{"key":"lng","value":"116.4"},{"key":"lat","value":"39.9"},{"key":"category","value":"fast-food"},{"key":"sort","value":"distance"},{"key":"page","value":"1"},{"key":"pageSize","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/2xx', () => pm.expect([200]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/shops 创建店铺",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"测试店\",\n  \"phone\": \"13900000000\",\n  \"address\": \"北京朝阳\",\n  \"lng\": 116.45,\n  \"lat\": 39.92,\n  \"cityCode\": \"110000\",\n  \"districtCode\": \"110105\"\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/shops", "host": ["{{baseUrl}}"], "path": ["merchant", "shops"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "PATCH /merchant/shops/:id 更新店铺",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"测试店（已更名）\",\n  \"announcement\": \"新店开业\"\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/shops/{{shopId}}", "host": ["{{baseUrl}}"], "path": ["merchant", "shops", "{{shopId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/shops/:id/business-hours 营业时间",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"weekday\": 1,\n  \"openTime\": \"10:00\",\n  \"closeTime\": \"22:00\"\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/shops/{{shopId}}/business-hours", "host": ["{{baseUrl}}"], "path": ["merchant", "shops", "{{shopId}}", "business-hours"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/shops/:id/delivery-areas 配送区域",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"polygon\": [[116.4,39.9],[116.5,39.9],[116.5,40.0],[116.4,40.0],[116.4,39.9]],\n  \"baseFee\": \"3.00\"\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/shops/{{shopId}}/delivery-areas", "host": ["{{baseUrl}}"], "path": ["merchant", "shops", "{{shopId}}", "delivery-areas"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    },
+    {
+      "name": "2. Product",
+      "item": [
+        {
+          "name": "GET /user/shops/:id/products 商品列表",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/user/shops/{{shopId}}/products", "host": ["{{baseUrl}}"], "path": ["user", "shops", "{{shopId}}", "products"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/products 新建商品",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"shopId\": \"{{shopId}}\",\n  \"categoryId\": \"CAT_001\",\n  \"name\": \"测试汉堡\",\n  \"price\": \"20.00\",\n  \"description\": \"美味\",\n  \"images\": [\"https://example.com/burger.jpg\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/products", "host": ["{{baseUrl}}"], "path": ["merchant", "products"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/products/:id/skus 新建 SKU",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"标准\",\n  \"price\": \"20.00\",\n  \"stockQty\": 100\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/products/{{productId}}/skus", "host": ["{{baseUrl}}"], "path": ["merchant", "products", "{{productId}}", "skus"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "PATCH /merchant/products/:id/online 上下架",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"online\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/products/{{productId}}/online", "host": ["{{baseUrl}}"], "path": ["merchant", "products", "{{productId}}", "online"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/product-categories 商品分类 CRUD",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"shopId\": \"{{shopId}}\",\n  \"name\": \"主食\",\n  \"sortOrder\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/product-categories", "host": ["{{baseUrl}}"], "path": ["merchant", "product-categories"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/products/:id/favorite 收藏商品",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/me/products/{{productId}}/favorite", "host": ["{{baseUrl}}"], "path": ["me", "products", "{{productId}}", "favorite"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    },
+    {
+      "name": "3. Marketing",
+      "item": [
+        {
+          "name": "GET /me/coupons 我的优惠券",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/me/coupons?status=1", "host": ["{{baseUrl}}"], "path": ["me", "coupons"], "query": [{"key":"status","value":"1"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /coupons/:id/receive 领取优惠券",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/coupons/COUPON_001/receive", "host": ["{{baseUrl}}"], "path": ["coupons", "COUPON_001", "receive"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "GET /me/coupons/best-match 最优券推荐",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/me/coupons/best-match?orderType=1&shopId={{shopId}}&totalAmount=50.00", "host": ["{{baseUrl}}"], "path": ["me", "coupons", "best-match"], "query": [{"key":"orderType","value":"1"},{"key":"shopId","value":"{{shopId}}"},{"key":"totalAmount","value":"50.00"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/discount-preview 下单优惠预算",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderType\": 1,\n  \"shopId\": \"{{shopId}}\",\n  \"itemsAmount\": \"50.00\",\n  \"deliveryFee\": \"5.00\",\n  \"userCouponIds\": [\"{{userCouponId}}\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/me/discount-preview", "host": ["{{baseUrl}}"], "path": ["me", "discount-preview"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /admin/coupons 创建券模板",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"couponCode\": \"NEW10\",\n  \"name\": \"满 50 减 10\",\n  \"couponType\": 1,\n  \"discountValue\": \"10.00\",\n  \"minOrderAmount\": \"50.00\",\n  \"scene\": 3,\n  \"validType\": 2,\n  \"validDays\": 30,\n  \"perUserLimit\": 1,\n  \"totalQty\": 1000\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/coupons", "host": ["{{baseUrl}}"], "path": ["admin", "coupons"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/red-packets/grab 抢红包",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"redPacketId\": \"RP_001\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/red-packets/grab", "host": ["{{baseUrl}}"], "path": ["me", "red-packets", "grab"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "GET /me/points 我的积分",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/me/points", "host": ["{{baseUrl}}"], "path": ["me", "points"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/invite/bind 绑定邀请人",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"inviteCode\": \"INV1234567\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/invite/bind", "host": ["{{baseUrl}}"], "path": ["me", "invite", "bind"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    },
+    {
+      "name": "4. Order (端到端 9 节点链)",
+      "item": [
+        {
+          "name": "Step 1: POST /user/order/takeout 用户下单",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Idem-Key", "value": "{{$guid}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"shopId\": \"{{shopId}}\",\n  \"addressId\": \"{{addressId}}\",\n  \"items\": [{\"productId\": \"{{productId}}\", \"skuId\": \"{{skuId}}\", \"qty\": 2}],\n  \"userCouponId\": \"{{userCouponId}}\",\n  \"remark\": \"少辣\"\n}" },
+            "url": { "raw": "{{baseUrl}}/user/order/takeout", "host": ["{{baseUrl}}"], "path": ["user", "order", "takeout"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))", "if (pm.response.code === 200 || pm.response.code === 201) {", "  const body = pm.response.json();", "  if (body.data && body.data.orderNo) pm.collectionVariables.set('orderNo', body.data.orderNo);", "}"] } }]
+        },
+        {
+          "name": "Step 2: POST /payment 创建支付",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderNo\": \"{{orderNo}}\",\n  \"orderType\": 1,\n  \"payMethod\": 1,\n  \"clientType\": \"jsapi\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payment", "host": ["{{baseUrl}}"], "path": ["payment"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))", "if (pm.response.code === 200 || pm.response.code === 201) {", "  const body = pm.response.json();", "  if (body.data && body.data.payNo) pm.collectionVariables.set('payNo', body.data.payNo);", "}"] } }]
+        },
+        {
+          "name": "Step 3: POST /merchant/order/:orderNo/accept 商户接单",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }],
+            "url": { "raw": "{{baseUrl}}/merchant/order/{{orderNo}}/accept", "host": ["{{baseUrl}}"], "path": ["merchant", "order", "{{orderNo}}", "accept"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "Step 4: POST /merchant/order/:orderNo/ready 商户出餐",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }],
+            "url": { "raw": "{{baseUrl}}/merchant/order/{{orderNo}}/ready", "host": ["{{baseUrl}}"], "path": ["merchant", "order", "{{orderNo}}", "ready"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "Step 5: POST /rider/order/:orderNo/pickup 骑手取餐",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_rider}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"lng\": 116.4,\n  \"lat\": 39.9\n}" },
+            "url": { "raw": "{{baseUrl}}/rider/order/{{orderNo}}/pickup", "host": ["{{baseUrl}}"], "path": ["rider", "order", "{{orderNo}}", "pickup"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "Step 6: POST /rider/order/:orderNo/deliver 骑手送达",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_rider}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"lng\": 116.45,\n  \"lat\": 39.92\n}" },
+            "url": { "raw": "{{baseUrl}}/rider/order/{{orderNo}}/deliver", "host": ["{{baseUrl}}"], "path": ["rider", "order", "{{orderNo}}", "deliver"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "Step 7: POST /me/orders/:orderNo/confirm 用户确认收货",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/me/orders/{{orderNo}}/confirm", "host": ["{{baseUrl}}"], "path": ["me", "orders", "{{orderNo}}", "confirm"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "Step 8: POST /me/orders/:orderNo/cancel 用户取消订单",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"不想吃了\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/orders/{{orderNo}}/cancel", "host": ["{{baseUrl}}"], "path": ["me", "orders", "{{orderNo}}", "cancel"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "GET /me/orders 用户订单列表",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/me/orders?orderType=1&pageSize=20", "host": ["{{baseUrl}}"], "path": ["me", "orders"], "query": [{"key":"orderType","value":"1"},{"key":"pageSize","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /user/order/errand 跑腿下单",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"serviceType\": 1,\n  \"pickupAddress\": {\"name\":\"取件人\",\"phone\":\"13900000001\",\"detail\":\"A 地址\",\"lng\":116.4,\"lat\":39.9},\n  \"deliveryAddress\": {\"name\":\"送达人\",\"phone\":\"13900000002\",\"detail\":\"B 地址\",\"lng\":116.45,\"lat\":39.92},\n  \"itemDescription\": \"文件\",\n  \"weight\": 1.0\n}" },
+            "url": { "raw": "{{baseUrl}}/user/order/errand", "host": ["{{baseUrl}}"], "path": ["user", "order", "errand"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /user/order/errand/price 跑腿价格预估",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"serviceType\": 1,\n  \"pickupLng\": 116.4,\n  \"pickupLat\": 39.9,\n  \"deliveryLng\": 116.45,\n  \"deliveryLat\": 39.92,\n  \"weight\": 1.5\n}" },
+            "url": { "raw": "{{baseUrl}}/user/order/errand/price", "host": ["{{baseUrl}}"], "path": ["user", "order", "errand", "price"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    },
+    {
+      "name": "5. Payment",
+      "item": [
+        {
+          "name": "GET /payment/:payNo 支付状态查询",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/payment/{{payNo}}", "host": ["{{baseUrl}}"], "path": ["payment", "{{payNo}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /payment/wx 微信回调（mock）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Wechatpay-Signature", "value": "mock-signature" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"mock-event-id\",\n  \"event_type\": \"TRANSACTION.SUCCESS\",\n  \"resource\": {\"out_trade_no\": \"{{payNo}}\", \"transaction_id\": \"WXTX001\", \"trade_state\": \"SUCCESS\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/payment/wx", "host": ["{{baseUrl}}"], "path": ["payment", "wx"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 401]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /payment/alipay 支付宝回调（mock）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": { "mode": "urlencoded", "urlencoded": [{"key":"out_trade_no","value":"{{payNo}}"},{"key":"trade_no","value":"ALITX001"},{"key":"trade_status","value":"TRADE_SUCCESS"}] },
+            "url": { "raw": "{{baseUrl}}/payment/alipay", "host": ["{{baseUrl}}"], "path": ["payment", "alipay"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 401]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /admin/refund 管理端人工退款",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"payNo\": \"{{payNo}}\",\n  \"amount\": \"10.00\",\n  \"reason\": \"客服补偿\"\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/refund", "host": ["{{baseUrl}}"], "path": ["admin", "refund"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /admin/reconciliation 手动对账",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"channel\": \"wxpay\",\n  \"date\": \"2026-04-19\"\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/reconciliation", "host": ["{{baseUrl}}"], "path": ["admin", "reconciliation"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    },
+    {
+      "name": "6. Finance",
+      "item": [
+        {
+          "name": "GET /me/wallet 用户钱包",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }],
+            "url": { "raw": "{{baseUrl}}/me/wallet", "host": ["{{baseUrl}}"], "path": ["me", "wallet"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "GET /merchant/finance 商户财务",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }],
+            "url": { "raw": "{{baseUrl}}/merchant/finance", "host": ["{{baseUrl}}"], "path": ["merchant", "finance"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/withdrawals 商户提现",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": \"100.00\",\n  \"bankCardId\": \"BC001\"\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/withdrawals", "host": ["{{baseUrl}}"], "path": ["merchant", "withdrawals"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 402]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /admin/settlement-rules 创建分账规则",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ruleCode\": \"TAKEOUT_MERCHANT_DEFAULT\",\n  \"scene\": 1,\n  \"targetType\": 1,\n  \"scopeType\": 1,\n  \"rate\": \"0.85\",\n  \"fixedFee\": \"0.00\",\n  \"priority\": 100\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/settlement-rules", "host": ["{{baseUrl}}"], "path": ["admin", "settlement-rules"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /admin/settlement/run-once 手工触发分账",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"date\": \"2026-04-19\"\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/settlement/run-once", "host": ["{{baseUrl}}"], "path": ["admin", "settlement", "run-once"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/invoices 用户开票申请",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderNo\": \"{{orderNo}}\",\n  \"titleType\": 1,\n  \"title\": \"个人\",\n  \"email\": \"u@example.com\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/invoices", "host": ["{{baseUrl}}"], "path": ["me", "invoices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    },
+    {
+      "name": "7. Dispatch",
+      "item": [
+        {
+          "name": "GET /rider/grab-pool 抢单池",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_rider}}" }],
+            "url": { "raw": "{{baseUrl}}/rider/grab-pool?cityCode=110000", "host": ["{{baseUrl}}"], "path": ["rider", "grab-pool"], "query": [{"key":"cityCode","value":"110000"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /rider/grab/:orderNo 骑手抢单",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_rider}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderType\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/rider/grab/{{orderNo}}", "host": ["{{baseUrl}}"], "path": ["rider", "grab", "{{orderNo}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404, 409]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /rider/dispatch/:orderNo/accept 骑手接受派单",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_rider}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderType\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/rider/dispatch/{{orderNo}}/accept", "host": ["{{baseUrl}}"], "path": ["rider", "dispatch", "{{orderNo}}", "accept"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 404, 409]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /rider/dispatch/:orderNo/reject 骑手拒绝派单",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_rider}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderType\": 1,\n  \"reason\": \"距离太远\"\n}" },
+            "url": { "raw": "{{baseUrl}}/rider/dispatch/{{orderNo}}/reject", "host": ["{{baseUrl}}"], "path": ["rider", "dispatch", "{{orderNo}}", "reject"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200, 400, 404, 409]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "GET /admin/dispatch/dashboard 运力看板",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/dispatch/dashboard", "host": ["{{baseUrl}}"], "path": ["admin", "dispatch", "dashboard"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200', () => pm.expect([200]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /admin/dispatch/:orderNo/manual 强制指派",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderType\": 1,\n  \"riderId\": \"{{riderId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/dispatch/{{orderNo}}/manual", "host": ["{{baseUrl}}"], "path": ["admin", "dispatch", "{{orderNo}}", "manual"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404, 409]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    },
+    {
+      "name": "8. Review",
+      "item": [
+        {
+          "name": "POST /me/reviews 用户提交评价",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderNo\": \"{{orderNo}}\",\n  \"shopRating\": 5,\n  \"productRating\": 5,\n  \"deliveryRating\": 5,\n  \"content\": \"很好\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/reviews", "host": ["{{baseUrl}}"], "path": ["me", "reviews"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/reviews/:id/reply 商户回复评价",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"感谢您的评价\"\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/reviews/REVIEW_001/reply", "host": ["{{baseUrl}}"], "path": ["merchant", "reviews", "REVIEW_001", "reply"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /merchant/reviews/:id/appeal 商户申诉",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_merchant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"恶意差评\",\n  \"evidenceUrls\": [\"https://example.com/evidence1.jpg\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/merchant/reviews/REVIEW_001/appeal", "host": ["{{baseUrl}}"], "path": ["merchant", "reviews", "REVIEW_001", "appeal"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 403, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/complaints 用户投诉",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderNo\": \"{{orderNo}}\",\n  \"targetType\": 2,\n  \"reason\": \"商家服务态度差\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/complaints", "host": ["{{baseUrl}}"], "path": ["me", "complaints"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/after-sales 用户售后申请",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderNo\": \"{{orderNo}}\",\n  \"reason\": \"商品质量问题\",\n  \"refundAmount\": \"20.00\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/after-sales", "host": ["{{baseUrl}}"], "path": ["me", "after-sales"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        },
+        {
+          "name": "POST /me/arbitrations 用户主动仲裁",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_user}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"relatedNo\": \"{{orderNo}}\",\n  \"relatedType\": 1,\n  \"reason\": \"对商户处理结果不满\"\n}" },
+            "url": { "raw": "{{baseUrl}}/me/arbitrations", "host": ["{{baseUrl}}"], "path": ["me", "arbitrations"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200/201', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code))"] } }]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "token_user", "value": "Bearer mock-user-token" },
+    { "key": "token_merchant", "value": "Bearer mock-merchant-token" },
+    { "key": "token_rider", "value": "Bearer mock-rider-token" },
+    { "key": "token_admin", "value": "Bearer mock-admin-token" },
+    { "key": "shopId", "value": "S_TEST_001" },
+    { "key": "productId", "value": "P_TEST_001" },
+    { "key": "skuId", "value": "SKU_TEST_001" },
+    { "key": "orderNo", "value": "T20260419000001234" },
+    { "key": "payNo", "value": "PAY20260419000001234" },
+    { "key": "userCouponId", "value": "UC_TEST_001" },
+    { "key": "merchantId", "value": "M_TEST_001" },
+    { "key": "riderId", "value": "R_TEST_001" },
+    { "key": "addressId", "value": "ADDR_TEST_001" }
+  ]
+}

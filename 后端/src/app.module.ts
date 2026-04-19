@@ -27,6 +27,7 @@ import { PaymentModule } from './modules/payment/payment.module'
 import { FinanceModule } from './modules/finance/finance.module'
 import { MarketingModule } from './modules/marketing/marketing.module'
 import { ReviewModule } from './modules/review/review.module'
+import { OrchestrationModule } from './modules/orchestration/orchestration.module'
 import { AdminModule } from './modules/admin/admin.module'
 import { StatsModule } from './modules/stats/stats.module'
 import { CustomerModule } from './modules/customer/customer.module'
@@ -67,6 +68,7 @@ import { CustomerModule } from './modules/customer/customer.module'
     FinanceModule,
     MarketingModule,
     ReviewModule,
+    OrchestrationModule,
     AdminModule,
     StatsModule,
     CustomerModule
