@@ -25,22 +25,33 @@
       "Geolocation": {},
       "OAuth": {},
       "Push": {},
-      "Speech": {}
+      "Speech": {},
+      "Camera": {},
+      "Maps": {}
     },
     "distribute": {
       "android": {
         "permissions": [
           "<uses-permission android:name=\"android.permission.INTERNET\"/>",
           "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>",
           "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
           "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
           "<uses-permission android:name=\"android.permission.ACCESS_BACKGROUND_LOCATION\"/>",
           "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\"/>",
           "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_LOCATION\"/>",
+          "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>",
           "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>",
           "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
           "<uses-permission android:name=\"android.permission.CAMERA\"/>",
-          "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
+          "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>",
+          "<uses-permission android:name=\"android.permission.CALL_PHONE\"/>",
+          "<uses-permission android:name=\"android.permission.READ_PHONE_STATE\"/>",
+          "<uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\"/>",
+          "<uses-permission android:name=\"android.permission.RECEIVE_BOOT_COMPLETED\"/>",
+          "<uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\"/>",
+          "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>",
+          "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>"
         ],
         "minSdkVersion": 26,
         "targetSdkVersion": 34,
@@ -49,12 +60,16 @@
       "ios": {
         "dSYMs": false,
         "deploymentTarget": "13.0",
+        "UIBackgroundModes": ["audio", "location", "fetch", "remote-notification"],
         "privacyDescription": {
           "NSLocationWhenInUseUsageDescription": "配送过程中上报实时位置，保障订单配送全程可追溯",
-          "NSLocationAlwaysAndWhenInUseUsageDescription": "骑手接单后持续上报位置，用于智能派单与轨迹回溯",
+          "NSLocationAlwaysAndWhenInUseUsageDescription": "骑手接单后持续上报位置，用于智能派单与轨迹回溯（包含后台运行）",
           "NSLocationAlwaysUsageDescription": "骑手接单后持续上报位置，用于智能派单与轨迹回溯",
           "NSCameraUsageDescription": "拍摄取送件凭证、上传身份证/健康证照片",
-          "NSMicrophoneUsageDescription": "语音联系用户/商家"
+          "NSPhotoLibraryUsageDescription": "选择凭证照片上传至订单",
+          "NSPhotoLibraryAddUsageDescription": "保存配送凭证至本机相册",
+          "NSMicrophoneUsageDescription": "语音播报新订单与联系用户/商家",
+          "NSContactsUsageDescription": "选取紧急联系人用于求助场景"
         }
       }
     },

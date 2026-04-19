@@ -38,6 +38,57 @@ module.exports = {
       true,
       { ignorePseudoClasses: ['global', 'export', 'deep'] }
     ],
+    'selector-type-no-unknown': [
+      true,
+      {
+        ignoreTypes: [
+          'page',
+          'navigator',
+          'switch',
+          'input',
+          'button',
+          'image',
+          'icon',
+          'cover-view',
+          'cover-image',
+          'movable-area',
+          'movable-view',
+          'scroll-view',
+          'swiper',
+          'swiper-item',
+          'view',
+          'text',
+          'web-view',
+          'rich-text',
+          'progress',
+          'checkbox',
+          'checkbox-group',
+          'radio',
+          'radio-group',
+          'picker',
+          'picker-view',
+          'slider',
+          'textarea',
+          'label',
+          'form',
+          'audio',
+          'video',
+          'camera',
+          'live-pusher',
+          'live-player',
+          'map',
+          'canvas',
+          'ad',
+          'official-account',
+          'open-data',
+          'editor',
+          'match-media',
+          'block',
+          'template',
+          'slot'
+        ]
+      }
+    ],
     'property-no-unknown': [true, { ignoreProperties: [] }],
     'at-rule-no-unknown': [
       true,
@@ -80,11 +131,5 @@ module.exports = {
       }
     ]
   },
-  ignoreFiles: [
-    'node_modules/**',
-    'unpackage/**',
-    'dist/**',
-    'build/**',
-    'src/static/**'
-  ]
+  ignoreFiles: ['node_modules/**', 'unpackage/**', 'dist/**', 'build/**', 'src/static/**']
 }

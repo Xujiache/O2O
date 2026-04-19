@@ -22,6 +22,15 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       __APP_ENV__: JSON.stringify(env.VITE_APP_ENV ?? mode)
+    },
+    /**
+     * 屏蔽 pinia 在生产构建时对 @vue/devtools-api / @vue/devtools-kit 的硬依赖（dev-only）
+     * 否则 rollup 报 "failed to resolve import" 终止构建
+     */
+    build: {
+      rollupOptions: {
+        external: ['@vue/devtools-api', '@vue/devtools-kit']
+      }
     }
   }
 })

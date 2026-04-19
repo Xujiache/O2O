@@ -1,137 +1,393 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios'
-
 /**
- * 统一 API 响应体结构（后端 NestJS 全局响应拦截器约定，详见 DESIGN_P1 §4）
- * - 成功：code === 0
- * - 失败：code !== 0（HttpException 为 HTTP 状态码；未捕获异常为 1000 兜底）
+ * @file request.ts
+ * @stage P7/T7.2 (Sprint 1)
+ * @desc 基于 uni.request 的统一 HTTP 客户端（替代 P1 骨架的 axios 版）
+ *
+ * P5/P6 经验教训：axios 在 mp-weixin 不稳定 / app vendor 内置 fetch 兼容差，
+ *               必须用 uni.request；骑手端在商户端基础上叠加：
+ *   - X-Client-Type: rider（必带，用于 P3 后端区分客户端身份）
+ *   - X-Rider-Id: <riderId>（store/auth.ts 通过 setRiderIdProvider 注入）
+ *   - X-Idem-Key: <hex>（写操作幂等：接单/送达/转单/提现/求助）
+ *   - 401 自动 refresh + 重放（仅一次）
+ *   - 网络错误指数退避重试 3 次
+ *   - 业务错误码统一 toast / 行为
+ *
+ * @author 单 Agent V2.0 (P7 骑手端)
  */
+import { logger } from './logger'
+import { getStorage, setStorage, removeStorage, STORAGE_KEYS } from './storage'
+
+/** 后端统一响应体 */
 export interface ApiResponse<T = unknown> {
   code: number
   message: string
   data: T
+  traceId?: string
   timestamp?: number
 }
 
+/** 业务错误（带 code） */
+export class BizError extends Error {
+  constructor(
+    public code: number,
+    message: string,
+    public traceId?: string
+  ) {
+    super(message)
+    this.name = 'BizError'
+  }
+}
+
+/** uni.request 支持的 HTTP 方法（PATCH 在 mp-weixin 不支持，统一去掉） */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+/** 请求选项 */
+export interface RequestOptions {
+  url: string
+  method?: HttpMethod
+  data?: unknown
+  headers?: Record<string, string>
+  /** 是否绕过 401 自动 refresh（auth/refresh 自身用） */
+  skipAuthRefresh?: boolean
+  /** 是否静默错误（不弹 toast） */
+  silent?: boolean
+  /** 超时（毫秒），默认 15s */
+  timeout?: number
+  /** 是否走根路径（不带 /api/v1 前缀） */
+  rootPath?: boolean
+  /** 重试次数（仅网络错误生效），默认 3 */
+  retry?: number
+  /** 幂等 key（写操作必带，自动生成） */
+  idemKey?: string
+  /** 服务端要求的额外 header（如 X-Sign） */
+  extraHeaders?: Record<string, string>
+}
+
+/** 401 处理：单飞 refresh，避免并发刷新打满 */
+let refreshPromise: Promise<string | null> | null = null
+
+/** 当前骑手 ID 提供器（避免 store 循环依赖；store 初始化时注入） */
+let currentRiderIdProvider: (() => string | null) | null = null
+
 /**
- * 读取 Vite 注入的运行时环境变量
- * 功能：屏蔽 uni-app / Vite / 原生 APP 环境变量差异
- * 参数：key 环境变量键名
- * 返回值：string 对应值（未定义时回退空串）
- * 用途：request 实例中读取 VITE_API_BASE_URL 等
+ * 注入当前骑手 ID 提供器（由 auth store 初始化时调用）
+ * 功能：让 request 在不直接 import auth store 的前提下注入 X-Rider-Id 头
+ * @param provider 返回当前骑手 ID 的函数；返回 null 则不注入
  */
+export function setRiderIdProvider(provider: () => string | null): void {
+  currentRiderIdProvider = provider
+}
+
+/** 读取 env 变量 */
 function getEnv(key: string): string {
-  const viteEnv = (import.meta as unknown as { env?: Record<string, string> }).env
-  if (viteEnv && key in viteEnv) return viteEnv[key] ?? ''
-  return ''
+  const env = (import.meta as unknown as { env?: Record<string, string> }).env
+  return env?.[key] ?? ''
+}
+
+const API_BASE = getEnv('VITE_API_BASE_URL') || 'http://localhost:3000/api/v1'
+const ROOT_BASE = API_BASE.replace(/\/api\/v\d+\/?$/i, '')
+const DEFAULT_TIMEOUT = Number(getEnv('VITE_API_TIMEOUT')) || 15000
+
+/**
+ * 拼接最终 URL
+ * @param url 路径
+ * @param rootPath 是否根路径
+ */
+function buildUrl(url: string, rootPath = false): string {
+  if (/^https?:\/\//.test(url)) return url
+  const base = rootPath ? ROOT_BASE : API_BASE
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`
 }
 
 /**
- * 从带 /api/vN 前缀的 base URL 中剥离出根域名
- * 功能：fetchHealth 等根级端点（如 /health、/docs）需要跳过 /api/v1 前缀
- * 参数：url 形如 http://host:port/api/v1
- * 返回值：去掉尾部 /api/vN(/ 可选) 的根 URL
- * 用途：rootRequest 的 baseURL 计算（I-01 修复根因）
+ * 静默 refresh token（单飞）
+ * @returns 新 accessToken；失败返回 null
  */
-function stripApiPrefix(url: string): string {
-  return url.replace(/\/api\/v\d+\/?$/i, '')
+async function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null
+    })
+  }
+  return refreshPromise
 }
 
-const apiBase = getEnv('VITE_API_BASE_URL') || 'http://localhost:3000/api/v1'
-const rootBase = stripApiPrefix(apiBase)
-const timeout = Number(getEnv('VITE_API_TIMEOUT')) || 15000
+async function doRefresh(): Promise<string | null> {
+  const refreshToken = getStorage<string>(STORAGE_KEYS.REFRESH_TOKEN)
+  if (!refreshToken) return null
+  try {
+    const data = await rawRequest<{ accessToken: string; refreshToken: string }>({
+      url: '/auth/refresh',
+      method: 'POST',
+      data: { refreshToken },
+      skipAuthRefresh: true,
+      silent: true,
+      retry: 0
+    })
+    setStorage(STORAGE_KEYS.TOKEN, data.accessToken, 1000 * 60 * 60 * 24 * 7)
+    setStorage(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken, 1000 * 60 * 60 * 24 * 30)
+    return data.accessToken
+  } catch (e) {
+    logger.warn('auth.refresh.fail', { e: String(e) })
+    return null
+  }
+}
+
+/** 401 → 跳转登录 */
+function redirectLogin(): void {
+  removeStorage(STORAGE_KEYS.TOKEN)
+  removeStorage(STORAGE_KEYS.REFRESH_TOKEN)
+  removeStorage(STORAGE_KEYS.USER_INFO)
+  const pages = getCurrentPages()
+  const cur = pages[pages.length - 1]
+  if (cur && cur.route?.includes('pages/login')) return
+  uni.reLaunch({ url: '/pages/login/index' })
+}
 
 /**
- * 为任意 axios 实例安装「请求 / 响应」拦截器
- * 功能：统一注入 token、统一解包 { code, message, data }、统一错误提示
- *       供 request（业务前缀 /api/v1）与 rootRequest（根级端点）共同复用
- * 参数：instance axios 实例；name 实例名称（仅用于调试日志区分）
- * 返回值：AxiosInstance（原实例，便于链式调用）
- * 用途：createRequest / createRootRequest 内部调用，禁止对外直接使用
+ * 错误码 toast 文案表（节选 P4 §10.4 错误码字典 + 骑手端常见）
  */
-function installInterceptors(instance: AxiosInstance, name: string): AxiosInstance {
-  instance.interceptors.request.use(
-    (config) => {
-      try {
-        const uniGlobal = (globalThis as { uni?: { getStorageSync?: (k: string) => string } }).uni
-        const token = uniGlobal?.getStorageSync?.('token')
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`
-        }
-      } catch {
-        /* H5 或非 uni 环境，静默忽略 */
-      }
-      return config
-    },
-    (err) => Promise.reject(err)
-  )
+const ERROR_TOAST: Record<number, string> = {
+  10001: '请求参数有误',
+  10010: '资源不存在',
+  10011: '操作冲突，请重试',
+  10101: '超出配送范围',
+  10300: '订单不存在',
+  10301: '订单当前状态不允许该操作',
+  10302: '非本人订单',
+  10303: '订单已被其他骑手抢走',
+  10304: '取件码错误',
+  10305: '已超过最大并行单数',
+  10400: '当前未在工作时段',
+  10500: '位置距取件/送达点过远',
+  10803: '提现金额超过余额',
+  10804: '银行卡未绑定',
+  10900: '骑手未上岗（请先打卡）',
+  10901: '骑手资质未审核',
+  10902: '骑手已被冻结',
+  10903: '健康证已过期',
+  10904: '保证金不足',
+  20001: '登录已过期，请重新登录',
+  20003: '权限不足',
+  30001: '操作过于频繁，请稍后重试',
+  30003: '请勿重复提交'
+}
 
-  instance.interceptors.response.use(
-    (res: AxiosResponse<ApiResponse>) => {
-      const body = res.data
-      if (body && body.code === 0) return body.data as unknown as AxiosResponse
-      return Promise.reject(new Error(body?.message || `[${name}] 业务错误`))
-    },
-    (err) => {
-      const message = err?.response?.data?.message || err.message || '网络异常，请稍后再试'
-      return Promise.reject(new Error(message))
+/**
+ * 业务错误统一处理
+ * @param code 业务码
+ * @param message 后端消息
+ * @param silent 是否静默
+ */
+function handleBizError(code: number, message: string, silent: boolean): void {
+  if (silent) return
+  const text = ERROR_TOAST[code] ?? message ?? '操作失败'
+  uni.showToast({ title: text, icon: 'none', duration: 2000 })
+}
+
+/** 网络错误延迟（指数退避） */
+function backoff(attempt: number): Promise<void> {
+  const ms = Math.min(1000 * 2 ** attempt, 5000)
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * 真正的请求函数（不含 401 处理）
+ * @param opt 请求选项
+ * @returns 解包后业务数据
+ */
+function rawRequest<T = unknown>(opt: RequestOptions): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const token = getStorage<string>(STORAGE_KEYS.TOKEN)
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json; charset=utf-8',
+      'X-Client-Type': 'rider',
+      ...(opt.extraHeaders ?? {}),
+      ...(opt.headers ?? {})
     }
-  )
-  return instance
-}
+    if (token && !opt.skipAuthRefresh) {
+      headers.Authorization = `Bearer ${token}`
+    }
+    if (opt.idemKey) {
+      headers['X-Idem-Key'] = opt.idemKey
+    }
+    /* 自动注入当前骑手 ID（写操作鉴权 / 派单匹配） */
+    const riderId = currentRiderIdProvider?.()
+    if (riderId) {
+      headers['X-Rider-Id'] = riderId
+    }
 
-/**
- * 创建业务 API axios 实例（baseURL 含 /api/v1 前缀）
- * 功能：所有业务 API 请求走同一实例
- * 参数：无
- * 返回值：AxiosInstance
- * 用途：P7+ 业务 API 封装统一依赖此实例
- */
-function createRequest(): AxiosInstance {
-  const instance = axios.create({
-    baseURL: apiBase,
-    timeout,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' }
+    uni.request({
+      url: buildUrl(opt.url, opt.rootPath),
+      method: opt.method ?? 'GET',
+      data: opt.data as never,
+      header: headers,
+      timeout: opt.timeout ?? DEFAULT_TIMEOUT,
+      success: (res) => {
+        const statusCode = (res as UniApp.RequestSuccessCallbackResult).statusCode
+        const body = (res as UniApp.RequestSuccessCallbackResult).data as ApiResponse<T> | T
+
+        if (statusCode === 401) {
+          reject(new BizError(20001, 'AUTH_TOKEN_INVALID'))
+          return
+        }
+        if (statusCode >= 500) {
+          reject(new Error(`服务异常 (${statusCode})`))
+          return
+        }
+        if (statusCode === 200 || statusCode === 201) {
+          if (body && typeof body === 'object' && 'code' in body) {
+            const r = body as ApiResponse<T>
+            if (r.code === 0) {
+              resolve(r.data)
+            } else {
+              reject(new BizError(r.code, r.message, r.traceId))
+            }
+            return
+          }
+          resolve(body as T)
+          return
+        }
+        if (statusCode === 400 && body && typeof body === 'object' && 'code' in body) {
+          const r = body as ApiResponse<T>
+          reject(new BizError(r.code, r.message, r.traceId))
+          return
+        }
+        reject(new Error(`HTTP ${statusCode}`))
+      },
+      fail: (err) => {
+        reject(new Error(err.errMsg ?? '网络异常，请稍后再试'))
+      }
+    })
   })
-  return installInterceptors(instance, 'request')
 }
 
 /**
- * 创建根级 API axios 实例（baseURL 不含 /api/v1）
- * 功能：专供 /health、/docs 等不在业务前缀下的系统级端点调用
- * 参数：无
- * 返回值：AxiosInstance
- * 用途：api/index.ts 的 fetchHealth 等系统端点；避免 404（I-01）
+ * 公开请求函数（带 401 自动 refresh + 网络重试 + 错误 toast）
+ * @param opt 请求选项
+ * @returns 解包后业务数据
  */
-function createRootRequest(): AxiosInstance {
-  const instance = axios.create({
-    baseURL: rootBase,
-    timeout,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' }
-  })
-  return installInterceptors(instance, 'rootRequest')
+export async function request<T = unknown>(opt: RequestOptions): Promise<T> {
+  const retry = opt.retry ?? 3
+  const silent = opt.silent ?? false
+  let lastError: unknown
+
+  for (let attempt = 0; attempt <= retry; attempt++) {
+    try {
+      return await rawRequest<T>(opt)
+    } catch (e) {
+      lastError = e
+      if (e instanceof BizError) {
+        if (e.code === 20001 && !opt.skipAuthRefresh) {
+          const newToken = await refreshAccessToken()
+          if (newToken) {
+            try {
+              return await rawRequest<T>(opt)
+            } catch (retryErr) {
+              if (retryErr instanceof BizError && retryErr.code === 20001) {
+                redirectLogin()
+              } else if (retryErr instanceof BizError) {
+                handleBizError(retryErr.code, retryErr.message, silent)
+              }
+              throw retryErr
+            }
+          }
+          redirectLogin()
+          handleBizError(e.code, '登录已过期', silent)
+          throw e
+        }
+        handleBizError(e.code, e.message, silent)
+        throw e
+      }
+      if (attempt < retry) {
+        logger.warn('request.retry', { url: opt.url, attempt: attempt + 1 })
+        await backoff(attempt)
+        continue
+      }
+      if (!silent) {
+        uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
+      }
+      throw e
+    }
+  }
+  throw lastError
 }
 
-export const request = createRequest()
-export const rootRequest = createRootRequest()
-
-/**
- * 通用 GET 请求（走 /api/v1 前缀）
- * 参数：url 路径；config axios 可选配置
- * 返回值：Promise<T> 解包后的业务数据
- */
-export function get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
-  return request.get(url, config) as unknown as Promise<T>
+/** GET 快捷方法 */
+export function get<T = unknown>(
+  url: string,
+  query?: Record<string, unknown>,
+  opt?: Omit<RequestOptions, 'url' | 'method' | 'data'>
+): Promise<T> {
+  let finalUrl = url
+  if (query && Object.keys(query).length > 0) {
+    const qs = Object.entries(query)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join('&')
+    if (qs) finalUrl = `${url}${url.includes('?') ? '&' : '?'}${qs}`
+  }
+  return request<T>({ ...opt, url: finalUrl, method: 'GET' })
 }
 
-/**
- * 通用 POST 请求（走 /api/v1 前缀）
- * 参数：url 路径；data 请求体；config axios 可选配置
- * 返回值：Promise<T> 解包后的业务数据
- */
+/** POST 快捷方法 */
 export function post<T = unknown>(
   url: string,
   data?: unknown,
-  config?: AxiosRequestConfig
+  opt?: Omit<RequestOptions, 'url' | 'method' | 'data'>
 ): Promise<T> {
-  return request.post(url, data, config) as unknown as Promise<T>
+  return request<T>({ ...opt, url, method: 'POST', data })
+}
+
+/** PUT 快捷方法 */
+export function put<T = unknown>(
+  url: string,
+  data?: unknown,
+  opt?: Omit<RequestOptions, 'url' | 'method' | 'data'>
+): Promise<T> {
+  return request<T>({ ...opt, url, method: 'PUT', data })
+}
+
+/**
+ * PATCH 快捷方法（uni.request 不支持 PATCH，降级为 POST + X-HTTP-Method-Override 头）
+ * 后端 NestJS 通过 method-override 中间件识别该头部
+ */
+export function patch<T = unknown>(
+  url: string,
+  data?: unknown,
+  opt?: Omit<RequestOptions, 'url' | 'method' | 'data'>
+): Promise<T> {
+  return request<T>({
+    ...opt,
+    url,
+    method: 'POST',
+    data,
+    extraHeaders: { ...(opt?.extraHeaders ?? {}), 'X-HTTP-Method-Override': 'PATCH' }
+  })
+}
+
+/** DELETE 快捷方法 */
+export function del<T = unknown>(
+  url: string,
+  opt?: Omit<RequestOptions, 'url' | 'method' | 'data'>
+): Promise<T> {
+  return request<T>({ ...opt, url, method: 'DELETE' })
+}
+
+/**
+ * 生成幂等 key（写操作必带）
+ * @returns 随机字符串（rd-{timestamp}-{rand}）
+ */
+export function genIdemKey(): string {
+  const t = Date.now().toString(36)
+  const r = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10)
+  return `rd-${t}-${r}`
+}
+
+/**
+ * 根域名 GET（不走 /api/v1 前缀）
+ * 用途：/health、/docs 等系统级端点
+ */
+export function rootGet<T = unknown>(url: string, query?: Record<string, unknown>): Promise<T> {
+  return get<T>(url, query, { rootPath: true })
 }

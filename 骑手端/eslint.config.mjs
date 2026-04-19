@@ -1,8 +1,9 @@
 // ----------------------------------------------------------------------------
 // 骑手端 ESLint flat config（ESLint 9 + typescript-eslint 8 + eslint-plugin-vue 9）
-//   - 严格对齐 DESIGN_P1 §6.1 规范栈
+//   - 严格对齐 DESIGN_P1 §6.1 规范栈 + P7 用户提示词硬约束
 //   - 作用域：仅 src/ 下 .ts / .vue 文件
-//   - 忽略：node_modules / unpackage / dist / env / src/types / 自动生成物
+//   - 忽略：node_modules / unpackage / dist / env / src/types / 自动生成物 / nativeplugins
+//   - P7 严格模式：禁用 any / @ts-expect-error / @ts-ignore（项目硬约束）
 // ----------------------------------------------------------------------------
 import pluginJs from '@eslint/js'
 import tseslint from 'typescript-eslint'
@@ -27,7 +28,8 @@ export default tseslint.config(
       'env',
       'src/types',
       'auto-imports.d.ts',
-      'components.d.ts'
+      'components.d.ts',
+      'nativeplugins/**'
     ]
   },
   {
@@ -47,7 +49,8 @@ export default tseslint.config(
         uni: 'readonly',
         plus: 'readonly',
         getApp: 'readonly',
-        getCurrentPages: 'readonly'
+        getCurrentPages: 'readonly',
+        UniApp: 'readonly'
       },
       parserOptions: {
         parser: tseslint.parser,
@@ -60,8 +63,18 @@ export default tseslint.config(
       quotes: ['error', 'single'],
       semi: ['error', 'never'],
       'no-var': 'error',
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        {
+          'ts-ignore': true,
+          'ts-expect-error': true,
+          'ts-nocheck': true,
+          'ts-check': false
+        }
+      ],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'vue/multi-word-component-names': 'off',
       'vue/html-self-closing': 'off',
       'no-multiple-empty-lines': ['warn', { max: 1 }],

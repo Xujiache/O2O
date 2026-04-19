@@ -1,26 +1,29 @@
 <template>
-  <view class="page page-wallet">
-    <text class="title">我的钱包（PRD §3.3.4 占位）</text>
+  <view class="wallet">
+    <view class="placeholder">钱包概览 — Sprint 5 实现（T7.32~T7.35）</view>
   </view>
 </template>
 
 <script setup lang="ts">
   /**
-   * 我的钱包模块占位页
-   * 功能：对齐 PRD §3.3.4，P7 阶段实现收入/奖励/罚款、账单、提现、薪资结算
-   * 参数：无
-   * 返回值：无
-   * 用途：P1 脚手架路由验证
+   * 我的钱包占位页（Sprint 5 实装）
+   * @author 单 Agent V2.0 (P7 骑手端)
    */
 </script>
 
 <style lang="scss" scoped>
-  .page-wallet {
-    padding: 48rpx 24rpx;
-    text-align: center;
+  .wallet {
+    min-height: 100vh;
+    padding: 32rpx;
+    background: $uni-bg-color-grey;
   }
-  .title {
-    font-size: 32rpx;
-    color: #333;
+
+  .placeholder {
+    padding: 32rpx;
+    font-size: 24rpx;
+    color: $uni-text-color-grey;
+    text-align: center;
+    background: #fff;
+    border-radius: 16rpx;
   }
 </style>

@@ -2,27 +2,37 @@
   "easycom": {
     "autoscan": true,
     "custom": {
-      "^u-(.*)": "uview-plus/components/u-$1/u-$1.vue"
+      "^u-(.*)": "uview-plus/components/u-$1/u-$1.vue",
+      "^Biz(.*)": "@/components/biz/Biz$1.vue"
     }
   },
   "pages": [
     {
       "path": "pages/login/index",
       "style": {
-        "navigationBarTitleText": "登录",
+        "navigationBarTitleText": "骑手登录",
         "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/home/workbench",
+      "style": {
+        "navigationBarTitleText": "工作台",
+        "enablePullDownRefresh": true
       }
     },
     {
       "path": "pages/hall/index",
       "style": {
-        "navigationBarTitleText": "接单大厅"
+        "navigationBarTitleText": "接单大厅",
+        "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/delivery/index",
+      "path": "pages/order/index",
       "style": {
-        "navigationBarTitleText": "订单配送"
+        "navigationBarTitleText": "我的订单",
+        "enablePullDownRefresh": true
       }
     },
     {
@@ -32,23 +42,110 @@
       }
     },
     {
-      "path": "pages/attendance/index",
+      "path": "pages/profile/index",
       "style": {
-        "navigationBarTitleText": "考勤统计"
+        "navigationBarTitleText": "我的"
       }
+    }
+  ],
+  "subPackages": [
+    {
+      "root": "pages-login",
+      "pages": [
+        { "path": "sms-login", "style": { "navigationBarTitleText": "短信登录" } },
+        { "path": "register", "style": { "navigationBarTitleText": "骑手注册" } },
+        {
+          "path": "qualification",
+          "style": { "navigationBarTitleText": "资质上传" }
+        },
+        { "path": "deposit", "style": { "navigationBarTitleText": "保证金缴纳" } },
+        { "path": "audit-status", "style": { "navigationBarTitleText": "审核状态" } },
+        { "path": "agreement", "style": { "navigationBarTitleText": "骑手协议" } },
+        { "path": "reset-password", "style": { "navigationBarTitleText": "重置密码" } }
+      ]
     },
     {
-      "path": "pages/message/index",
-      "style": {
-        "navigationBarTitleText": "消息中心"
-      }
+      "root": "pages-hall",
+      "pages": [
+        {
+          "path": "preference",
+          "style": { "navigationBarTitleText": "接单偏好" }
+        },
+        { "path": "detail", "style": { "navigationBarTitleText": "订单详情" } }
+      ]
+    },
+    {
+      "root": "pages-order",
+      "pages": [
+        { "path": "detail", "style": { "navigationBarTitleText": "订单详情" } },
+        { "path": "pickup-scan", "style": { "navigationBarTitleText": "取件核验" } },
+        { "path": "proof-upload", "style": { "navigationBarTitleText": "凭证上传" } },
+        { "path": "abnormal", "style": { "navigationBarTitleText": "异常上报" } },
+        { "path": "transfer", "style": { "navigationBarTitleText": "申请转单" } },
+        { "path": "nav", "style": { "navigationBarTitleText": "配送导航" } }
+      ]
+    },
+    {
+      "root": "pages-wallet",
+      "pages": [
+        { "path": "bill-list", "style": { "navigationBarTitleText": "账单明细" } },
+        { "path": "withdraw", "style": { "navigationBarTitleText": "提现" } },
+        {
+          "path": "withdraw-record",
+          "style": { "navigationBarTitleText": "提现记录" }
+        },
+        { "path": "bank-card", "style": { "navigationBarTitleText": "银行卡" } },
+        {
+          "path": "bank-card-edit",
+          "style": { "navigationBarTitleText": "添加银行卡" }
+        },
+        { "path": "salary-rule", "style": { "navigationBarTitleText": "薪资规则" } },
+        { "path": "salary-export", "style": { "navigationBarTitleText": "导出薪资" } }
+      ]
+    },
+    {
+      "root": "pages-attendance",
+      "pages": [
+        { "path": "checkin", "style": { "navigationBarTitleText": "上下班打卡" } },
+        { "path": "history", "style": { "navigationBarTitleText": "考勤记录" } },
+        { "path": "schedule", "style": { "navigationBarTitleText": "排班" } },
+        { "path": "leave", "style": { "navigationBarTitleText": "请假申请" } }
+      ]
+    },
+    {
+      "root": "pages-stat",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "数据统计" } },
+        { "path": "level", "style": { "navigationBarTitleText": "等级与积分" } },
+        { "path": "reward", "style": { "navigationBarTitleText": "奖惩记录" } },
+        { "path": "appeal", "style": { "navigationBarTitleText": "申诉" } }
+      ]
+    },
+    {
+      "root": "pages-msg",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "消息中心" } },
+        { "path": "detail", "style": { "navigationBarTitleText": "消息详情" } }
+      ]
+    },
+    {
+      "root": "pages-setting",
+      "pages": [
+        { "path": "accept", "style": { "navigationBarTitleText": "接单设置" } },
+        { "path": "notify", "style": { "navigationBarTitleText": "通知设置" } },
+        { "path": "security", "style": { "navigationBarTitleText": "账号安全" } },
+        { "path": "help", "style": { "navigationBarTitleText": "帮助中心" } },
+        { "path": "feedback", "style": { "navigationBarTitleText": "意见反馈" } },
+        { "path": "about", "style": { "navigationBarTitleText": "关于我们" } },
+        { "path": "emergency", "style": { "navigationBarTitleText": "紧急求助" } }
+      ]
     }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "O2O 骑手端",
     "navigationBarBackgroundColor": "#00B578",
-    "backgroundColor": "#F5F6F8"
+    "backgroundColor": "#F5F7FA"
   },
   "tabBar": {
     "color": "#999999",
@@ -56,11 +153,11 @@
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
+      { "pagePath": "pages/home/workbench", "text": "工作台" },
       { "pagePath": "pages/hall/index", "text": "接单" },
-      { "pagePath": "pages/delivery/index", "text": "配送" },
+      { "pagePath": "pages/order/index", "text": "订单" },
       { "pagePath": "pages/wallet/index", "text": "钱包" },
-      { "pagePath": "pages/attendance/index", "text": "考勤" },
-      { "pagePath": "pages/message/index", "text": "消息" }
+      { "pagePath": "pages/profile/index", "text": "我的" }
     ]
   }
 }
