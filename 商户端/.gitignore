@@ -1,0 +1,21 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+unpackage/
+.vite/
+.tsbuildinfo
+*.tsbuildinfo
+
+# Lint 临时输出
+lint_output.txt
+lint.json
+
+# 自动生成（如有）
+auto-imports.d.ts
+components.d.ts
+
+# 缓存
+.eslintcache
+.stylelintcache

@@ -1,43 +1,72 @@
 /**
- * uni-app 全局样式变量
- * 商户端主色：蓝色（对应后台/工具类应用视觉）
- * 仅 P1 占位，P6 阶段按设计稿扩展
+ * uni-app 全局样式变量（商户端）
+ *
+ * 主题色：#2F80ED（DESIGN §七 商户端主色，区别于用户端 #2D8CF0）
+ * 状态色：待接单 #FF4D4F / 配送中 #1890FF / 已完成 #52C41A / 异常 #FA8C16
+ *
+ * P5 经验教训：变量与 mixin 必须全部内联在本文件，禁止组件再 @import
+ *               相对路径，避免嵌套页面注入失败（详见 P5_REPAIR_REPORT_R1）
  */
 
 @import 'uview-plus/theme';
 
-$uni-color-primary: #2d8cf0;
-$uni-color-success: #67c23a;
-$uni-color-warning: #e6a23c;
-$uni-color-error: #f56c6c;
+/* ========== 商户端品牌色 ========== */
+$uni-color-primary: #2f80ed;
+$uni-color-primary-dark: #1a6fd8;
+$uni-color-primary-light: #e8f1fd;
+$uni-color-success: #52c41a;
+$uni-color-warning: #fa8c16;
+$uni-color-error: #ff4d4f;
+$uni-color-info: #909399;
 
-$uni-text-color: #333;
+/* ========== 订单状态色（NewOrderModal / OrderCard 引用） ========== */
+$order-pending: #ff4d4f;
+$order-accepted: #1890ff;
+$order-cooking: #fa8c16;
+$order-delivering: #1890ff;
+$order-finished: #52c41a;
+$order-canceled: #909399;
+$order-abnormal: #f5222d;
+
+/* ========== 文字 ========== */
+$uni-text-color: #2c3e50;
 $uni-text-color-inverse: #fff;
-$uni-text-color-grey: #999;
-$uni-text-color-placeholder: #808080;
+$uni-text-color-grey: #606266;
+$uni-text-color-placeholder: #909399;
 $uni-text-color-disable: #c0c4cc;
 
+/* ========== 背景 ========== */
 $uni-bg-color: #fff;
-$uni-bg-color-grey: #f5f6f8;
-$uni-bg-color-hover: #f1f1f1;
-$uni-bg-color-mask: rgb(0 0 0 / 40%);
+$uni-bg-color-grey: #f5f7fa;
+$uni-bg-color-hover: #ecf5ff;
+$uni-bg-color-mask: rgb(0 0 0 / 60%);
 
-$uni-border-color: #e5e5e5;
+$uni-border-color: #ebeef5;
+$uni-border-color-light: #f2f6fc;
 
+/* ========== 间距 ========== */
 $uni-size-grid: 4px;
+
+/* ========== 字号 ========== */
 $uni-font-size-sm: 12px;
 $uni-font-size-base: 14px;
 $uni-font-size-lg: 16px;
+$uni-font-size-title: 18px;
+$uni-font-size-subtitle: 16px;
+$uni-font-size-paragraph: 14px;
 
+/* ========== 图片尺寸 ========== */
 $uni-img-size-sm: 20px;
 $uni-img-size-base: 26px;
 $uni-img-size-lg: 40px;
 
-$uni-border-radius-sm: 2px;
-$uni-border-radius-base: 4px;
-$uni-border-radius-lg: 8px;
+/* ========== 圆角 ========== */
+$uni-border-radius-sm: 4px;
+$uni-border-radius-base: 8px;
+$uni-border-radius-lg: 12px;
 $uni-border-radius-circle: 50%;
 
+/* ========== 行内 / 列内间距 ========== */
 $uni-spacing-row-sm: 5px;
 $uni-spacing-row-base: 10px;
 $uni-spacing-row-lg: 15px;
@@ -47,6 +76,44 @@ $uni-spacing-col-lg: 12px;
 
 $uni-opacity-disabled: 0.3;
 
-$uni-font-size-title: 20px;
-$uni-font-size-subtitle: 26px;
-$uni-font-size-paragraph: 15px;
+/* ========== 商户端业务专用 ========== */
+$mchnt-card-shadow: 0 2px 12px rgb(0 0 0 / 6%);
+$mchnt-modal-radius: 16px;
+$mchnt-tab-active: $uni-color-primary;
+$mchnt-tab-inactive: $uni-text-color-grey;
+
+/* ========== 通用 mixin ========== */
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin text-ellipsis($lines: 1) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  @if $lines == 1 {
+    white-space: nowrap;
+  } @else {
+    display: -webkit-box;
+    -webkit-line-clamp: $lines;
+    -webkit-box-orient: vertical;
+  }
+}
+
+@mixin safe-area-top {
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+@mixin safe-area-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}

@@ -2,7 +2,8 @@
   "easycom": {
     "autoscan": true,
     "custom": {
-      "^u-(.*)": "uview-plus/components/u-$1/u-$1.vue"
+      "^u-(.*)": "uview-plus/components/u-$1/u-$1.vue",
+      "^Biz(.*)": "@/components/biz/Biz$1.vue"
     }
   },
   "pages": [
@@ -14,15 +15,17 @@
       }
     },
     {
-      "path": "pages/shop/index",
+      "path": "pages/home/workbench",
       "style": {
-        "navigationBarTitleText": "店铺管理"
+        "navigationBarTitleText": "工作台",
+        "enablePullDownRefresh": true
       }
     },
     {
       "path": "pages/order/index",
       "style": {
-        "navigationBarTitleText": "订单管理"
+        "navigationBarTitleText": "订单管理",
+        "enablePullDownRefresh": true
       }
     },
     {
@@ -38,29 +41,42 @@
       }
     },
     {
-      "path": "pages/data/index",
+      "path": "pages/profile/index",
       "style": {
-        "navigationBarTitleText": "数据概览"
+        "navigationBarTitleText": "我的"
       }
+    }
+  ],
+  "subPackages": [
+    {
+      "root": "pages-login",
+      "pages": [
+        { "path": "sms-login", "style": { "navigationBarTitleText": "短信登录" } },
+        { "path": "register", "style": { "navigationBarTitleText": "商户入驻" } },
+        { "path": "qualification", "style": { "navigationBarTitleText": "资质上传" } },
+        { "path": "audit-status", "style": { "navigationBarTitleText": "审核状态" } },
+        { "path": "reset-password", "style": { "navigationBarTitleText": "重置密码" } },
+        { "path": "agreement", "style": { "navigationBarTitleText": "用户协议" } }
+      ]
     }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "O2O 商户端",
-    "navigationBarBackgroundColor": "#2D8CF0",
-    "backgroundColor": "#F5F6F8"
+    "navigationBarBackgroundColor": "#2F80ED",
+    "backgroundColor": "#F5F7FA"
   },
   "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#2D8CF0",
+    "color": "#909399",
+    "selectedColor": "#2F80ED",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/shop/index", "text": "店铺" },
+      { "pagePath": "pages/home/workbench", "text": "工作台" },
       { "pagePath": "pages/order/index", "text": "订单" },
       { "pagePath": "pages/product/index", "text": "商品" },
       { "pagePath": "pages/finance/index", "text": "财务" },
-      { "pagePath": "pages/data/index", "text": "数据" }
+      { "pagePath": "pages/profile/index", "text": "我的" }
     ]
   }
 }

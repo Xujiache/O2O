@@ -243,12 +243,27 @@ importers:
       '@dcloudio/uni-mp-weixin':
         specifier: 3.0.0-alpha-5000720260416001
         version: 3.0.0-alpha-5000720260416001(@vueuse/core@13.9.0(vue@3.5.32(typescript@5.6.3)))(postcss@8.5.10)(rollup@4.60.2)(ts-node@10.9.2(@types/node@22.19.17)(typescript@5.6.3))(vue@3.5.32(typescript@5.6.3))
+      '@qiun/ucharts':
+        specifier: 2.5.0-20230101
+        version: 2.5.0-20230101
       axios:
         specifier: ^1.12.2
         version: 1.15.0
+      currency.js:
+        specifier: ^2.0.4
+        version: 2.0.4
+      dayjs:
+        specifier: ^1.11.13
+        version: 1.11.20
+      lodash-es:
+        specifier: ^4.17.21
+        version: 4.18.1
       pinia:
         specifier: ^3.0.3
         version: 3.0.4(typescript@5.6.3)(vue@3.5.32(typescript@5.6.3))
+      pinia-plugin-persistedstate:
+        specifier: ^4.4.1
+        version: 4.7.1(pinia@3.0.4(typescript@5.6.3)(vue@3.5.32(typescript@5.6.3)))
       uview-plus:
         specifier: ^3.7.36
         version: 3.7.36
@@ -277,6 +292,9 @@ importers:
       '@eslint/js':
         specifier: ^9.14.0
         version: 9.39.4
+      '@types/lodash-es':
+        specifier: ^4.17.12
+        version: 4.17.12
       '@types/node':
         specifier: ^22.7.0
         version: 22.19.17
@@ -3063,6 +3081,9 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
+  '@qiun/ucharts@2.5.0-20230101':
+    resolution: {integrity: sha512-C7ccBgfPuGF6dxTRuMW0NPPMSCf1k/kh3I9zkRVBc5PaivudX/rPL+jd2Wty6gn5ya5L3Ob+YmYe09V5xw66Cw==}
+
   '@rolldown/pluginutils@1.0.0-rc.13':
     resolution: {integrity: sha512-3ngTAv6F/Py35BsYbeeLeecvhMKdsKm4AoOETVhAA+Qc8nrA2I0kF7oa93mE9qnIurngOSpMnQ0x2nQY2FPviA==}
 
@@ -5152,6 +5173,10 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  currency.js@2.0.4:
+    resolution: {integrity: sha512-6/OplJYgJ0RUlli74d93HJ/OsKVBi8lB1+Z6eJYS1YZzBuIp4qKKHpJ7ad+GvTlWmLR/hLJOWTykN5Nm8NJ7+w==}
+    engines: {node: '>=4'}
 
   cz-conventional-changelog@3.3.0:
     resolution: {integrity: sha512-U466fIzU5U22eES5lTNiNbZ+d8dfcHcssH4o7QsdWaCcRs/feIPCxKYSWkYBNs5mny7MvEfwpTLWjvbm94hecw==}
@@ -12730,6 +12755,8 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
+  '@qiun/ucharts@2.5.0-20230101': {}
+
   '@rolldown/pluginutils@1.0.0-rc.13': {}
 
   '@rollup/pluginutils@5.1.0(rollup@4.60.2)':
@@ -15875,6 +15902,8 @@ snapshots:
       cssom: 0.3.8
 
   csstype@3.2.3: {}
+
+  currency.js@2.0.4: {}
 
   cz-conventional-changelog@3.3.0(@types/node@24.12.2)(typescript@5.6.3):
     dependencies:
