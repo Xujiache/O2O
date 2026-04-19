@@ -15,6 +15,7 @@
  */
 import { logger } from './logger'
 import type { MerchantOrder } from '@/types/biz'
+import { renderOrderReceipt } from './escpos'
 
 /** 打印机状态 */
 export type PrinterState = 'disconnected' | 'connecting' | 'connected' | 'printing' | 'error'
@@ -224,13 +225,12 @@ class BluetoothPrinter {
   }
 
   /**
-   * 构造 ESC/POS 字节流（简化版；S6 阶段完整实现）
-   * 模板：店铺名 / 订单号 / 下单时间 / 商品列表 / 备注 / 配送地址 / 总计
+   * 构造 ESC/POS 字节流（S6 完整实现）
+   * 模板见 escpos.ts → renderOrderReceipt
    */
   private buildEscPosBuffer(task: PrintTask): ArrayBuffer {
-    /* 简化骨架：返回空 buffer；S6 阶段补完整 ESC/POS 模板 */
-    const text = `店铺：${task.order.shopName}\n订单：${task.order.orderNo}\n金额：${task.order.payAmount}\n`
-    return new TextEncoder().encode(text).buffer as ArrayBuffer
+    const paperWidth = (this.device?.paperWidth ?? 58) as 58 | 80
+    return renderOrderReceipt(task.order, paperWidth, task.copyType)
   }
 }
 
