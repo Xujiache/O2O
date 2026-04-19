@@ -29,6 +29,12 @@
       "Camera": {},
       "Maps": {}
     },
+    "nativePlugins": {
+      "Rider-LocationFgs": {
+        "version": "1.0.0",
+        "provider": "O2O 骑手端"
+      }
+    },
     "distribute": {
       "android": {
         "permissions": [

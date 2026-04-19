@@ -29,10 +29,10 @@ export class KalmanFilter1D {
   private inited = false
 
   /**
-   * @param processNoise 过程噪声（典型 1e-5）
-   * @param measureNoise 观测噪声（典型 1e-2）
+   * @param processNoise 过程噪声（典型 1e-5；越小越信任历史预测）
+   * @param measureNoise 观测噪声（典型 5e-2；越大越不信任新观测，对漂移抑制更强）
    */
-  constructor(processNoise: number = 1e-5, measureNoise: number = 1e-2) {
+  constructor(processNoise: number = 1e-5, measureNoise: number = 5e-2) {
     this.q = processNoise
     this.r = measureNoise
     this.p = 1
@@ -82,7 +82,7 @@ export class GpsKalman {
   private readonly lngKf: KalmanFilter1D
   private readonly latKf: KalmanFilter1D
 
-  constructor(processNoise = 1e-5, measureNoise = 1e-2) {
+  constructor(processNoise = 1e-5, measureNoise = 5e-2) {
     this.lngKf = new KalmanFilter1D(processNoise, measureNoise)
     this.latKf = new KalmanFilter1D(processNoise, measureNoise)
   }
