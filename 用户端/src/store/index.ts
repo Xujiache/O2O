@@ -1,27 +1,23 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-
 /**
- * 全局 App Store（Pinia，setup 语法）
- * 功能：承载登录态、全局 loading、主题等与业务模块解耦的状态
- * 参数：无
- * 返回值：Pinia Store 实例
- * 用途：P5 阶段各业务模块创建各自 store，此处仅保留全局根 store
+ * @file store/index.ts
+ * @stage P5/T5.5 (Sprint 1)
+ * @desc Pinia 入口 + persistedstate 插件注册；按需 re-export 各 store
+ * @author 单 Agent V2.0
  */
-export const useAppStore = defineStore('app', () => {
-  const token = ref<string>('')
-  const isLogin = ref<boolean>(false)
+import { createPinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
-  /**
-   * 更新登录态
-   * 参数：newToken 新 token 字符串
-   * 返回值：无
-   * 用途：登录成功 / 退出登录时调用
-   */
-  function setToken(newToken: string) {
-    token.value = newToken
-    isLogin.value = Boolean(newToken)
-  }
+/** 创建 Pinia 实例（在 main.ts 注入） */
+export function setupPinia() {
+  const pinia = createPinia()
+  pinia.use(piniaPluginPersistedstate)
+  return pinia
+}
 
-  return { token, isLogin, setToken }
-})
+export { useAppStore } from './app'
+export { useUserStore } from './user'
+export { useLocationStore } from './location'
+export { useCartStore } from './cart'
+export { useOrderStore } from './order'
+export { useMsgStore } from './msg'
+export { useUiStore } from './ui'

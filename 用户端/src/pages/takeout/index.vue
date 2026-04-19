@@ -1,26 +1,45 @@
 <template>
-  <view class="page page-takeout">
-    <text class="title">外卖点餐（PRD §3.1.2 占位）</text>
+  <view class="page takeout">
+    <view class="takeout__hero">
+      <text class="takeout__title">外卖点餐</text>
+      <text class="takeout__subtitle">附近优选 · 准时送达</text>
+    </view>
+    <BizLoading text="正在加载附近店铺..." />
   </view>
 </template>
 
 <script setup lang="ts">
   /**
-   * 外卖点餐模块占位页
-   * 功能：对齐 PRD §3.1.2 外卖点餐；P5 阶段实现商家列表/详情/购物车/下单/评价
-   * 参数：无
-   * 返回值：无
-   * 用途：P1 仅用于注册 pages 路由与菜单验证
+   * @file pages/takeout/index.vue
+   * @stage P5/T5.13 (Sprint 2)
+   * @desc 外卖独立 tab 页（首页推荐入口直跳店铺列表，本页保留兼容路由）
+   * @author 单 Agent V2.0
    */
+  import { onLoad } from '@dcloudio/uni-app'
+  import BizLoading from '@/components/biz/BizLoading.vue'
+
+  onLoad(() => {
+    /* 默认跳首页（首页 tab 即外卖+跑腿混合入口） */
+    setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 200)
+  })
 </script>
 
 <style lang="scss" scoped>
-  .page-takeout {
-    padding: 48rpx 24rpx;
+  .takeout {
+    padding: 64rpx 32rpx;
     text-align: center;
-  }
-  .title {
-    font-size: 32rpx;
-    color: #333;
+
+    &__title {
+      font-size: 40rpx;
+      font-weight: 600;
+      color: #ff6a1a;
+    }
+
+    &__subtitle {
+      display: block;
+      margin-top: 16rpx;
+      font-size: 28rpx;
+      color: #999;
+    }
   }
 </style>

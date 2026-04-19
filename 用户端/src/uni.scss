@@ -1,64 +1,169 @@
 /**
- * uni-app 全局样式变量（可在任意 .vue 文件中直接使用）
- * 对齐 PRD §3.1 用户端主视觉：橙色主色调（外卖/跑腿应用常见用色）
- * 仅 P1 阶段占位，P5 阶段按 UI 设计稿扩展
+ * @file uni.scss
+ * @stage P5/T5.2 (Sprint 1)
+ * @desc uni-app 全局 SCSS 变量入口；自动注入到所有 .vue 的 style 块
+ *   注意：本文件被 uni-app 编译器自动注入，路径切换会导致相对 import 失效
+ *   故所有变量直接内联，不引用其他 .scss 文件
+ * @author 单 Agent V2.0
  */
 
 @import 'uview-plus/theme';
 
-/* 基础颜色 */
-$uni-color-primary: #ff6b35;
-$uni-color-success: #67c23a;
-$uni-color-warning: #e6a23c;
-$uni-color-error: #f56c6c;
+/* ========== 主题色（PRD §3.1 用户端橙色调） ========== */
+$color-primary: #ff6a1a;
+$color-primary-light: #ff8e53;
+$color-primary-dark: #d95611;
+$color-success: #67c23a;
+$color-warning: #e6a23c;
+$color-danger: #f56c6c;
+$color-info: #909399;
 
-/* 文字 */
-$uni-text-color: #333;
-$uni-text-color-inverse: #fff;
-$uni-text-color-grey: #999;
-$uni-text-color-placeholder: #808080;
-$uni-text-color-disable: #c0c4cc;
+/* ========== 中性色 ========== */
+$color-text-primary: #333;
+$color-text-regular: #666;
+$color-text-secondary: #999;
+$color-text-placeholder: #c0c4cc;
+$color-text-disabled: #c0c4cc;
+$color-text-inverse: #fff;
+$color-border: #e5e5e5;
+$color-border-light: #ebeef5;
+$color-divider: #f2f2f2;
+$color-bg-page: #f5f6f8;
+$color-bg-white: #fff;
+$color-bg-hover: #f7f7f7;
+$color-bg-mask: rgba(0, 0, 0, 0.5);
 
-/* 背景 */
-$uni-bg-color: #fff;
-$uni-bg-color-grey: #f5f6f8;
+/* ========== 圆角（rpx） ========== */
+$radius-xs: 4rpx;
+$radius-sm: 8rpx;
+$radius-md: 16rpx;
+$radius-lg: 24rpx;
+$radius-xl: 32rpx;
+$radius-circle: 50%;
+
+/* ========== 间距（rpx） ========== */
+$spacing-xs: 8rpx;
+$spacing-sm: 16rpx;
+$spacing-md: 24rpx;
+$spacing-lg: 32rpx;
+$spacing-xl: 48rpx;
+$spacing-xxl: 64rpx;
+
+/* ========== 字号（rpx） ========== */
+$font-size-xs: 20rpx;
+$font-size-sm: 24rpx;
+$font-size-base: 28rpx;
+$font-size-md: 32rpx;
+$font-size-lg: 36rpx;
+$font-size-xl: 40rpx;
+$font-size-xxl: 48rpx;
+
+/* ========== 字重 ========== */
+$font-weight-light: 300;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-bold: 600;
+
+/* ========== 阴影 ========== */
+$shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+$shadow-lg: 0 8rpx 24rpx rgba(0, 0, 0, 0.12);
+
+/* ========== Z-index ========== */
+$z-index-dropdown: 1000;
+$z-index-sticky: 1100;
+$z-index-fixed: 1200;
+$z-index-modal: 2000;
+$z-index-popover: 2100;
+$z-index-toast: 3000;
+$z-index-loading: 4000;
+
+/* ========== 公用 mixin ========== */
+@mixin ellipsis($lines: 1) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  @if $lines == 1 {
+    white-space: nowrap;
+  } @else {
+    display: -webkit-box;
+    -webkit-line-clamp: $lines;
+    -webkit-box-orient: vertical;
+  }
+}
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin hairline-bottom($color: $color-border) {
+  position: relative;
+
+  &::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1rpx;
+    content: '';
+    background-color: $color;
+    transform: scaleY(0.5);
+    transform-origin: 0 100%;
+  }
+}
+
+@mixin safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ========== uView Plus 主题色覆盖 ========== */
+$u-primary: $color-primary;
+$u-warning: $color-warning;
+$u-success: $color-success;
+$u-error: $color-danger;
+$u-info: $color-info;
+
+/* ========== uni-app 标准变量 ========== */
+$uni-color-primary: $color-primary;
+$uni-color-success: $color-success;
+$uni-color-warning: $color-warning;
+$uni-color-error: $color-danger;
+$uni-text-color: $color-text-primary;
+$uni-text-color-inverse: $color-text-inverse;
+$uni-text-color-grey: $color-text-secondary;
+$uni-text-color-placeholder: $color-text-placeholder;
+$uni-text-color-disable: $color-text-disabled;
+$uni-bg-color: $color-bg-white;
+$uni-bg-color-grey: $color-bg-page;
 $uni-bg-color-hover: #f1f1f1;
-$uni-bg-color-mask: rgb(0 0 0 / 40%);
-
-/* 边框 */
-$uni-border-color: #e5e5e5;
-
-/* 尺寸 */
-$uni-size-grid: 4px;
-
-/* 文字尺寸 */
-$uni-font-size-sm: 12px;
-$uni-font-size-base: 14px;
-$uni-font-size-lg: 16px;
-
-/* 图片尺寸 */
-$uni-img-size-sm: 20px;
-$uni-img-size-base: 26px;
-$uni-img-size-lg: 40px;
-
-/* 圆角 */
-$uni-border-radius-sm: 2px;
-$uni-border-radius-base: 4px;
-$uni-border-radius-lg: 8px;
+$uni-bg-color-mask: rgba(0, 0, 0, 0.4);
+$uni-border-color: $color-border;
+$uni-size-grid: 8rpx;
+$uni-font-size-sm: 24rpx;
+$uni-font-size-base: 28rpx;
+$uni-font-size-lg: 32rpx;
+$uni-img-size-sm: 40rpx;
+$uni-img-size-base: 52rpx;
+$uni-img-size-lg: 80rpx;
+$uni-border-radius-sm: 4rpx;
+$uni-border-radius-base: 8rpx;
+$uni-border-radius-lg: 16rpx;
 $uni-border-radius-circle: 50%;
-
-/* 间距 */
-$uni-spacing-row-sm: 5px;
-$uni-spacing-row-base: 10px;
-$uni-spacing-row-lg: 15px;
-$uni-spacing-col-sm: 4px;
-$uni-spacing-col-base: 8px;
-$uni-spacing-col-lg: 12px;
-
-/* 透明度 */
+$uni-spacing-row-sm: 8rpx;
+$uni-spacing-row-base: 16rpx;
+$uni-spacing-row-lg: 24rpx;
+$uni-spacing-col-sm: 8rpx;
+$uni-spacing-col-base: 16rpx;
+$uni-spacing-col-lg: 24rpx;
 $uni-opacity-disabled: 0.3;
-
-/* 文章字体 */
-$uni-font-size-title: 20px;
-$uni-font-size-subtitle: 26px;
-$uni-font-size-paragraph: 15px;
+$uni-font-size-title: 36rpx;
+$uni-font-size-subtitle: 32rpx;
+$uni-font-size-paragraph: 30rpx;
