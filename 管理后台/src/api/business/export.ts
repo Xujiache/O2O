@@ -1,12 +1,16 @@
 /**
  * 异步导出 API
+ *
+ * 后端暂无 /admin/export/job 端点（P9 补），
+ * 当前走 mock 模式或降级为同步 blob 下载。
+ *
  * @module api/business/export
  */
 import { bizApi } from './_request'
 import type { ExportJob } from '@/utils/business/export-async'
 
 export const exportApi = {
-  /** 创建任务（业务方传 module + filters） */
+  /** 创建任务（P9 待后端补 ExportJobController；当前走 mock） */
   create: (params: {
     module: string
     filters?: Record<string, unknown>

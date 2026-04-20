@@ -1039,7 +1039,7 @@ const handlers: MockHandler[] = [
   },
   /* 用户 */
   {
-    test: (p) => p === '/user/list',
+    test: (p) => p === '/users',
     handle: async (_p, _m, params) => {
       const page = Number(params?.page || 1)
       const pageSize = Number(params?.pageSize || 20)
@@ -1051,7 +1051,7 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => /^\/user\/\d+$/.test(p),
+    test: (p) => /^\/users\/\d+$/.test(p),
     handle: async (p) => {
       const id = Number(p.split('/').pop())
       const u = mockUsers.find((x) => x.id === id) || mockUsers[0]
@@ -1079,7 +1079,7 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => p === '/user/risk/list',
+    test: (p) => p === '/blacklist',
     handle: async (_p, _m, params) => {
       const page = Number(params?.page || 1)
       const pageSize = Number(params?.pageSize || 20)
@@ -1089,7 +1089,7 @@ const handlers: MockHandler[] = [
   },
   /* 商户 */
   {
-    test: (p) => p === '/merchant/audit/list',
+    test: (p) => p === '/merchants' || p === '/merchant/audit/list',
     handle: async (_p, _m, params) => {
       const filtered = mockMerchants.filter(
         (m) => m.auditStatus === 0 || m.auditStatus === Number(params?.status)
@@ -1098,12 +1098,12 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => p === '/merchant/list',
+    test: (p) => p === '/merchants/list',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockMerchants, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => /^\/merchant\/\d+$/.test(p),
+    test: (p) => /^\/merchants\/\d+$/.test(p),
     handle: async (p) => {
       const id = Number(p.split('/').pop())
       const m = mockMerchants.find((x) => x.id === id) || mockMerchants[0]
@@ -1112,7 +1112,7 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => p === '/shop/list',
+    test: (p) => p === '/shops',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockShops, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
@@ -1129,7 +1129,7 @@ const handlers: MockHandler[] = [
   },
   /* 骑手 */
   {
-    test: (p) => p === '/rider/audit/list',
+    test: (p) => p === '/riders' || p === '/rider/audit/list',
     handle: async (_p, _m, params) =>
       fakeDelay(
         list(
@@ -1140,7 +1140,7 @@ const handlers: MockHandler[] = [
       )
   },
   {
-    test: (p) => p === '/rider/list',
+    test: (p) => p === '/riders/list',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockRiders, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
@@ -1158,7 +1158,7 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => /^\/rider\/\d+$/.test(p),
+    test: (p) => /^\/riders\/\d+$/.test(p),
     handle: async (p) => {
       const id = Number(p.split('/').pop())
       const r = mockRiders.find((x) => x.id === id) || mockRiders[0]
@@ -1176,7 +1176,7 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => p === '/rider/transfer-audit/list',
+    test: (p) => p === '/transfers',
     handle: async (_p, _m, params) => {
       const list2 = Array.from({ length: 12 }).map((_, i) => ({
         id: 5000 + i,
@@ -1226,7 +1226,7 @@ const handlers: MockHandler[] = [
   },
   /* 订单 */
   {
-    test: (p) => p === '/order/list',
+    test: (p) => p === '/orders',
     handle: async (_p, _m, params) => {
       const status = params?.status !== undefined ? Number(params.status) : null
       const keyword = (params?.keyword as string) || ''
@@ -1241,7 +1241,7 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => /^\/order\/[A-Za-z0-9]+$/.test(p),
+    test: (p) => /^\/orders\/[A-Za-z0-9]+$/.test(p),
     handle: async (p) => {
       const orderNo = p.split('/').pop()!
       const o = mockOrders.find((x) => x.orderNo === orderNo) || mockOrders[0]
@@ -1269,7 +1269,7 @@ const handlers: MockHandler[] = [
     }
   },
   {
-    test: (p) => p === '/order/cancel-refund-audit/list',
+    test: (p) => p === '/after-sales',
     handle: async (_p, _m, params) =>
       fakeDelay(
         list(
@@ -1280,23 +1280,23 @@ const handlers: MockHandler[] = [
       )
   },
   {
-    test: (p) => p === '/order/complaint/list',
+    test: (p) => p === '/complaints',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockTickets, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/order/arbitration/list',
+    test: (p) => p === '/arbitrations',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockArbitrations, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   /* 商品/内容/评价 */
   {
-    test: (p) => p === '/product/list',
+    test: (p) => p === '/products',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockProducts, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/product/violation/list',
+    test: (p) => p === '/products/violation',
     handle: async (_p, _m, params) =>
       fakeDelay(
         list(
@@ -1351,12 +1351,12 @@ const handlers: MockHandler[] = [
       fakeDelay(list(mockNotices, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/review/list',
+    test: (p) => p === '/reviews',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockReviews, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/review/appeal/list',
+    test: (p) => p === '/review-appeals',
     handle: async (_p, _m, params) =>
       fakeDelay(
         list(
@@ -1368,12 +1368,12 @@ const handlers: MockHandler[] = [
   },
   /* 运营 */
   {
-    test: (p) => p === '/ops/coupon/list',
+    test: (p) => p === '/coupons',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockCoupons, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/ops/promotion/list',
+    test: (p) => p === '/promotions',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockPromotions, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
@@ -1431,18 +1431,18 @@ const handlers: MockHandler[] = [
       })
   },
   {
-    test: (p) => p === '/finance/settlement-rule/list',
+    test: (p) => p === '/settlement-rules',
     handle: async () => fakeDelay(mockSettlementRules)
   },
   {
-    test: (p) => p === '/finance/settlement-record/list',
+    test: (p) => p === '/settlement-records',
     handle: async (_p, _m, params) =>
       fakeDelay(
         list(mockSettlementRecords, Number(params?.page || 1), Number(params?.pageSize || 20))
       )
   },
   {
-    test: (p) => p === '/finance/withdraw-audit/list',
+    test: (p) => p === '/withdrawals',
     handle: async (_p, _m, params) => {
       const status = params?.status !== undefined ? Number(params.status) : null
       let filtered = mockWithdraws
@@ -1457,12 +1457,12 @@ const handlers: MockHandler[] = [
       fakeDelay(list(mockBills, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/finance/invoice-audit/list',
+    test: (p) => p === '/invoices',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockInvoices, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/finance/reconciliation/list',
+    test: (p) => p === '/reconciliation-report',
     handle: async (_p, _m, params) =>
       fakeDelay(
         list(mockSettlementRecords, Number(params?.page || 1), Number(params?.pageSize || 20))
@@ -1498,12 +1498,12 @@ const handlers: MockHandler[] = [
   },
   /* 客服/风控 */
   {
-    test: (p) => p === '/cs/ticket/list',
+    test: (p) => p === '/tickets',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockTickets, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },
   {
-    test: (p) => p === '/cs/arbitration/list',
+    test: (p) => p === '/arbitrations/cs',
     handle: async (_p, _m, params) =>
       fakeDelay(list(mockArbitrations, Number(params?.page || 1), Number(params?.pageSize || 20)))
   },

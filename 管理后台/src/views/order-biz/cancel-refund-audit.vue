@@ -25,7 +25,7 @@
           <ElInputNumber
             v-model="passForm.amount"
             :min="0"
-            :max="currentOrder ? Number(currentOrder.amountTotal) : 0"
+            :max="currentOrder ? currency(currentOrder.amountTotal).value : 0"
             :step="0.01"
             :precision="2"
             controls-position="right"
@@ -67,8 +67,8 @@
   import type { BizOrder, BizListParams } from '@/types/business'
   import { BizTable, BizModal } from '@/components/biz'
   import type { BizTableColumn, BizRowAction } from '@/components/biz/BizTable.vue'
-  import { maskMobile, formatAmount, fmtDateTime } from '@/utils/business/format'
-  import { compareAmount } from '@/utils/business/format'
+  import currency from 'currency.js'
+  import { maskMobile, formatAmount, fmtDateTime, compareAmount } from '@/utils/business/format'
 
   const tableRef = ref<InstanceType<typeof BizTable> | null>(null)
 
@@ -119,7 +119,7 @@
       type: 'success',
       onClick: (row) => {
         currentOrder.value = row as unknown as BizOrder
-        passForm.amount = Number(currentOrder.value.amountTotal)
+        passForm.amount = currency(currentOrder.value.amountTotal).value
         passVisible.value = true
       }
     },

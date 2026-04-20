@@ -20,7 +20,7 @@
         />
       </template>
       <template #cell-enabled="{ row }">
-        <ElTag v-if="(row as { enabled: boolean }).enabled" type="success">启用</ElTag>
+        <ElTag v-if="rowEnabled(row)" type="success">启用</ElTag>
         <ElTag v-else type="info">停用</ElTag>
       </template>
       <template #actions>
@@ -138,6 +138,9 @@
 
   function rowImg(row: unknown): string {
     return (row as { imgUrl?: string })?.imgUrl || ''
+  }
+  function rowEnabled(row: unknown): boolean {
+    return !!(row as { enabled?: boolean })?.enabled
   }
 
   const editVisible = ref(false)

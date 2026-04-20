@@ -1,5 +1,10 @@
 /**
  * 订单管理 API
+ *
+ * 路径对齐后端：
+ *   AdminOrderController   → /admin/orders, /admin/order/:orderNo/*
+ *   AdminReviewController  → /admin/complaints, /admin/arbitrations, /admin/after-sales
+ *
  * @module api/business/order
  */
 import { bizApi } from './_request'
@@ -7,42 +12,39 @@ import type { BizListParams, BizListResp, BizOrder, OrderFlowNode } from '@/type
 
 export const orderApi = {
   list: (params: BizListParams & { status?: number; bizType?: string }) =>
-    bizApi.get<BizListResp<BizOrder>>('/order/list', params as Record<string, unknown>),
+    bizApi.get<BizListResp<BizOrder>>('/orders', params as Record<string, unknown>),
   detail: (orderNo: string) =>
     bizApi.get<
       BizOrder & {
         flow: OrderFlowNode[]
         items: Array<{ name: string; qty: number; price: string }>
       }
-    >(`/order/${orderNo}`),
+    >(`/orders/${orderNo}`),
   forceCancel: (orderNo: string, reason: string) =>
     bizApi.post<void>(`/order/${orderNo}/force-cancel`, { reason }, { needSign: true }),
-  /** 取消/退款审核 */
+  /** 售后工作台（对齐 AdminReviewController /admin/after-sales） */
   cancelRefundAuditList: (params: BizListParams) =>
-    bizApi.get<BizListResp<BizOrder>>(
-      '/order/cancel-refund-audit/list',
-      params as Record<string, unknown>
-    ),
-  cancelRefundPass: (orderNo: string, refundAmount: string) =>
+    bizApi.get<BizListResp<BizOrder>>('/after-sales', params as Record<string, unknown>),
+  cancelRefundPass: (id: string, refundAmount: string) =>
     bizApi.post<void>(
-      `/order/cancel-refund-audit/${orderNo}/pass`,
-      { refundAmount },
+      `/after-sales/${id}/resolve`,
+      { action: 'agree', actualAmount: refundAmount },
       { needSign: true }
     ),
-  cancelRefundReject: (orderNo: string, reason: string) =>
+  cancelRefundReject: (id: string, reason: string) =>
     bizApi.post<void>(
-      `/order/cancel-refund-audit/${orderNo}/reject`,
-      { reason },
+      `/after-sales/${id}/resolve`,
+      { action: 'reject', reason },
       { needSign: true }
     ),
   /** 投诉 */
   complaintList: (params: BizListParams) =>
-    bizApi.get<BizListResp<unknown>>('/order/complaint/list', params as Record<string, unknown>),
+    bizApi.get<BizListResp<unknown>>('/complaints', params as Record<string, unknown>),
   complaintHandle: (id: number | string, action: 'process' | 'close', remark?: string) =>
-    bizApi.post<void>(`/order/complaint/${id}/${action}`, { remark }),
+    bizApi.post<void>(`/complaints/${id}/handle`, { action, remark }),
   /** 仲裁 */
   arbitrationList: (params: BizListParams) =>
-    bizApi.get<BizListResp<unknown>>('/order/arbitration/list', params as Record<string, unknown>),
+    bizApi.get<BizListResp<unknown>>('/arbitrations', params as Record<string, unknown>),
   arbitrationJudge: (
     id: number | string,
     payload: {
@@ -50,5 +52,5 @@ export const orderApi = {
       refundAmount?: string
       remark?: string
     }
-  ) => bizApi.post<void>(`/order/arbitration/${id}/judge`, payload, { needSign: true })
+  ) => bizApi.post<void>(`/arbitrations/${id}/judge`, payload, { needSign: true })
 }

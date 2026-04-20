@@ -1,5 +1,11 @@
 /**
  * 运营管理 API（优惠券 / 促销 / 推送 / 区域）
+ *
+ * 路径对齐后端：
+ *   CouponAdminController    → /admin/coupons
+ *   PromotionAdminController → /admin/promotions
+ *   推送/区域后端暂无 admin 控制器，暂保留路径标记 P9
+ *
  * @module api/business/ops
  */
 import { bizApi } from './_request'
@@ -16,28 +22,28 @@ import type {
 export const opsApi = {
   /** 优惠券 */
   couponList: (params: BizListParams) =>
-    bizApi.get<BizListResp<BizCoupon>>('/ops/coupon/list', params as Record<string, unknown>),
+    bizApi.get<BizListResp<BizCoupon>>('/coupons', params as Record<string, unknown>),
   couponSave: (data: Partial<BizCoupon>) =>
-    bizApi.post<{ id: BizId }>('/ops/coupon', data, { needSign: true }),
+    bizApi.post<{ id: BizId }>('/coupons', data, { needSign: true }),
   couponUpdate: (id: BizId, data: Partial<BizCoupon>) =>
-    bizApi.put<void>(`/ops/coupon/${id}`, data, { needSign: true }),
+    bizApi.put<void>(`/coupons/${id}`, data, { needSign: true }),
   couponBatchIssue: (
     id: BizId,
     payload: { strategy: 'all' | 'city' | 'tag'; param?: Record<string, unknown> }
-  ) => bizApi.post<void>(`/ops/coupon/${id}/batch-issue`, payload, { needSign: true }),
-  couponPause: (id: BizId) => bizApi.post<void>(`/ops/coupon/${id}/pause`),
+  ) => bizApi.post<void>(`/coupons/${id}/issue`, payload, { needSign: true }),
+  couponPause: (id: BizId) => bizApi.put<void>(`/coupons/${id}`, { status: 2 }, { needSign: true }),
 
   /** 促销 */
   promotionList: (params: BizListParams) =>
-    bizApi.get<BizListResp<BizPromotion>>('/ops/promotion/list', params as Record<string, unknown>),
+    bizApi.get<BizListResp<BizPromotion>>('/promotions', params as Record<string, unknown>),
   promotionSave: (data: Partial<BizPromotion>) =>
-    bizApi.post<{ id: BizId }>('/ops/promotion', data, { needSign: true }),
+    bizApi.post<{ id: BizId }>('/promotions', data, { needSign: true }),
   promotionUpdate: (id: BizId, data: Partial<BizPromotion>) =>
-    bizApi.put<void>(`/ops/promotion/${id}`, data, { needSign: true }),
+    bizApi.put<void>(`/promotions/${id}`, data, { needSign: true }),
   promotionToggle: (id: BizId, enabled: boolean) =>
-    bizApi.post<void>(`/ops/promotion/${id}/toggle`, { enabled }),
+    bizApi.put<void>(`/promotions/${id}/status`, { status: enabled ? 1 : 2 }),
 
-  /** 推送 */
+  /** 推送（P9 待后端补 admin 控制器，暂保留路径） */
   pushList: (params: BizListParams) =>
     bizApi.get<BizListResp<BizPushTask>>('/ops/push/list', params as Record<string, unknown>),
   pushSave: (data: Partial<BizPushTask>) =>
@@ -55,7 +61,7 @@ export const opsApi = {
     content: string
   }) => bizApi.post<{ id: BizId }>('/ops/push-template', data, { needSign: true }),
 
-  /** 区域 */
+  /** 区域（P9 待后端补 admin 控制器，暂保留路径） */
   regionList: () => bizApi.get<BizRegion[]>('/ops/region/list'),
   regionSave: (data: Partial<BizRegion>) =>
     bizApi.put<void>(`/ops/region/${data.cityCode}`, data, { needSign: true }),

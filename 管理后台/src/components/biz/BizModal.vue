@@ -17,7 +17,7 @@
     @close="onClose"
   >
     <slot :loading="loading" />
-    <template v-if="showFooter" #footer>
+    <template v-if="showFooter || $slots.footer" #footer>
       <slot name="footer" :loading="loading" :close="close" :submit="onSubmit">
         <ElButton :disabled="loading" @click="close">{{
           cancelText || $t('biz.common.cancel')
