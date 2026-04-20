@@ -380,6 +380,12 @@ export class OrderService {
       args.push(`%${keyword}%`)
     }
 
+    /* isReviewed 过滤（用户端） */
+    if ('isReviewed' in query && (query as UserOrderQueryDto).isReviewed != null) {
+      where.push('is_reviewed = ?')
+      args.push((query as UserOrderQueryDto).isReviewed!)
+    }
+
     const sql = `(SELECT
         id, order_no, user_id, shop_id, merchant_id, rider_id,
         status, pay_status, pay_amount, refund_amount, created_at,

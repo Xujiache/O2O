@@ -58,6 +58,15 @@ export class Rider extends BaseEntity {
   idCardHash!: string
 
   @Column({
+    name: 'id_card_tail4',
+    type: 'varchar',
+    length: 4,
+    nullable: true,
+    comment: '身份证后4位（脱敏展示）'
+  })
+  idCardTail4!: string | null
+
+  @Column({
     name: 'gender',
     type: 'tinyint',
     unsigned: true,

@@ -118,6 +118,12 @@ export class UserOrderQueryDto extends OrderKeysetQueryBaseDto {
   @IsString()
   @MaxLength(64)
   keyword?: string
+
+  @ApiPropertyOptional({ description: '是否已评价（0=未评价 1=已评价）', enum: [0, 1] })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  isReviewed?: 0 | 1
 }
 
 /**

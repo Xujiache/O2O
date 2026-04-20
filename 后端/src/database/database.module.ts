@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { OrderShardJob } from './jobs/order-shard-job'
 import {
   D1_ENTITIES,
   D2_REGION_ENTITIES,
@@ -25,6 +27,7 @@ import {
  */
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -54,6 +57,7 @@ import {
         autoLoadEntities: true
       })
     })
-  ]
+  ],
+  providers: [OrderShardJob]
 })
 export class DatabaseModule {}

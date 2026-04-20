@@ -110,6 +110,15 @@ export class User extends BaseEntity {
   })
   idCardHash!: string | null
 
+  @Column({
+    name: 'id_card_tail4',
+    type: 'varchar',
+    length: 4,
+    nullable: true,
+    comment: '身份证后4位（脱敏展示）'
+  })
+  idCardTail4!: string | null
+
   /* ===== 真实姓名（仅 _enc） ===== */
   @Column({
     name: 'real_name_enc',
