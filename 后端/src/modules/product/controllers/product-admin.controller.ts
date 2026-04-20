@@ -19,15 +19,16 @@ import {
   ApiTags
 } from '@nestjs/swagger'
 import { PageResult } from '@/common'
-import { CurrentUser, UserTypes } from '@/modules/auth/decorators'
-import { JwtAuthGuard, UserTypeGuard } from '@/modules/auth/guards'
+import { CurrentUser, Permissions, UserTypes } from '@/modules/auth/decorators'
+import { JwtAuthGuard, PermissionGuard, UserTypeGuard } from '@/modules/auth/guards'
 import { AdminQueryProductDto, ForceOffDto, ProductVo } from '../dto/product.dto'
 import { ProductService } from '../services/product.service'
 
 @ApiTags('管理后台 - 商品')
 @ApiBearerAuth()
 @Controller('admin/products')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('product:manage')
 @UserTypes('admin')
 export class AdminProductController {
   constructor(private readonly productService: ProductService) {}

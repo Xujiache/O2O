@@ -206,6 +206,7 @@
         })
         await opsApi.couponBatchIssue(c.id, { strategy: 'all' })
         ElMessage.success('已加入发放队列')
+        tableRef.value?.reload()
       }
     },
     {

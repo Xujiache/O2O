@@ -38,7 +38,7 @@ export abstract class BaseEntity {
   @CreateDateColumn({
     name: 'created_at',
     type: 'datetime',
-    precision: 3,
+    precision: 6,
     comment: '创建时间'
   })
   createdAt!: Date
@@ -46,7 +46,7 @@ export abstract class BaseEntity {
   @UpdateDateColumn({
     name: 'updated_at',
     type: 'datetime',
-    precision: 3,
+    precision: 6,
     comment: '更新时间'
   })
   updatedAt!: Date
@@ -54,7 +54,7 @@ export abstract class BaseEntity {
   @DeleteDateColumn({
     name: 'deleted_at',
     type: 'datetime',
-    precision: 3,
+    precision: 6,
     nullable: true,
     comment: '删除时间（软删）'
   })

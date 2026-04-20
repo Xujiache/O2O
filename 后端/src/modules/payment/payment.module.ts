@@ -49,6 +49,7 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Account, AccountFlow, PaymentRecord, Reconciliation, RefundRecord } from '@/entities'
 import { HealthModule } from '@/health/health.module'
+import { OrderModule } from '@/modules/order/order.module'
 import { REVIEW_DEP_REFUND_SERVICE } from '@/modules/review/types/review.types'
 import { UserModule } from '@/modules/user/user.module'
 import { AlipayAdapter } from './adapters/alipay.adapter'
@@ -69,7 +70,10 @@ import { RefundNotifyController } from './controllers/refund-notify.controller'
 import { WxPayNotifyController } from './controllers/wx-pay-notify.controller'
 import { ReconciliationCronProcessor } from './processors/reconciliation-cron.processor'
 import { BalanceService } from './services/balance.service'
-import { paymentEventsPublisherProvider } from './services/payment-events.publisher'
+import {
+  PAYMENT_EVENTS_PUBLISHER,
+  paymentEventsPublisherProvider
+} from './services/payment-events.publisher'
 import { PaymentStateMachine } from './services/payment-state-machine'
 import { PaymentService } from './services/payment.service'
 import { ReconciliationService } from './services/reconciliation.service'
@@ -118,6 +122,7 @@ const reviewRefundServiceProvider: Provider = {
   imports: [
     TypeOrmModule.forFeature([PaymentRecord, RefundRecord, Account, AccountFlow, Reconciliation]),
     HealthModule,
+    OrderModule,
     UserModule,
     /* ScheduleModule.forRoot() 在 app.module.ts 未注册（任务约束）；本模块自管 */
     ScheduleModule.forRoot()
@@ -161,7 +166,8 @@ const reviewRefundServiceProvider: Provider = {
     BalanceService,
     ReconciliationService,
     PaymentStateMachine,
-    REVIEW_DEP_REFUND_SERVICE
+    REVIEW_DEP_REFUND_SERVICE,
+    PAYMENT_EVENTS_PUBLISHER
   ]
 })
 export class PaymentModule {}

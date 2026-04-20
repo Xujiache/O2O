@@ -23,8 +23,8 @@ import {
 } from '@nestjs/swagger'
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator'
 import { PageResult } from '@/common'
-import { CurrentUser, UserTypes } from '@/modules/auth/decorators'
-import { JwtAuthGuard, UserTypeGuard } from '@/modules/auth/guards'
+import { CurrentUser, Permissions, UserTypes } from '@/modules/auth/decorators'
+import { JwtAuthGuard, PermissionGuard, UserTypeGuard } from '@/modules/auth/guards'
 import { CreateRedPacketDto, QueryRedPacketDto, RedPacketVo } from '../dto/red-packet.dto'
 import { RedPacketService } from '../services/red-packet.service'
 
@@ -42,7 +42,8 @@ class CancelRedPacketDto {
 @ApiTags('管理后台 - 红包池')
 @ApiBearerAuth()
 @Controller('admin/red-packets')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('marketing:redpacket')
 @UserTypes('admin')
 export class RedPacketAdminController {
   constructor(private readonly redPacketService: RedPacketService) {}

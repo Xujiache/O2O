@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { HealthModule } from '@/health/health.module'
 import { OrderShardJob } from './jobs/order-shard-job'
 import {
   D1_ENTITIES,
@@ -27,6 +28,7 @@ import {
  */
 @Module({
   imports: [
+    HealthModule,
     ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

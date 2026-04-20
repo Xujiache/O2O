@@ -20,8 +20,8 @@ import {
   ApiTags
 } from '@nestjs/swagger'
 import { type PageResult } from '@/common'
-import { CurrentUser, UserTypes, type AuthUser } from '@/modules/auth/decorators'
-import { JwtAuthGuard, UserTypeGuard } from '@/modules/auth/guards'
+import { CurrentUser, Permissions, UserTypes, type AuthUser } from '@/modules/auth/decorators'
+import { JwtAuthGuard, PermissionGuard, UserTypeGuard } from '@/modules/auth/guards'
 import {
   CreateRefundDto,
   QueryReconciliationDto,
@@ -39,7 +39,8 @@ import { RefundService } from '../services/refund.service'
 @ApiTags('管理后台 - 退款')
 @ApiBearerAuth()
 @Controller('admin/refund')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('finance:payment')
 @UserTypes('admin')
 export class RefundAdminController {
   constructor(private readonly refundService: RefundService) {}
@@ -80,7 +81,8 @@ export class RefundAdminController {
 @ApiTags('管理后台 - 对账')
 @ApiBearerAuth()
 @Controller('admin/reconciliation')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('finance:payment')
 @UserTypes('admin')
 export class ReconciliationAdminController {
   constructor(private readonly reconciliationService: ReconciliationService) {}
@@ -119,7 +121,8 @@ export class ReconciliationAdminController {
 @ApiTags('管理后台 - 对账记录')
 @ApiBearerAuth()
 @Controller('admin/reconciliations')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('finance:payment')
 @UserTypes('admin')
 export class ReconciliationListAdminController {
   constructor(private readonly reconciliationService: ReconciliationService) {}

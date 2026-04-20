@@ -93,6 +93,11 @@
   }
 
   async function onSaveRow(row: BizSettlementRule) {
+    const total = Number(row.platformRate) + Number(row.merchantRate) + Number(row.riderRate)
+    if (Math.abs(total - 100) > 0.01) {
+      ElMessage.warning(`平台+商户+骑手分润比例合计必须为 100%，当前为 ${total.toFixed(2)}%`)
+      return
+    }
     try {
       await financeApi.settlementRuleUpdate(row.id, row)
       ElMessage.success('已保存')

@@ -6,10 +6,12 @@
  * @Global() 标记：全局可注入 SysConfigService
  */
 import { Global, Module } from '@nestjs/common'
+import { HealthModule } from '@/health/health.module'
 import { SysConfigService } from './sys-config.service'
 
 @Global()
 @Module({
+  imports: [HealthModule],
   providers: [SysConfigService],
   exports: [SysConfigService]
 })

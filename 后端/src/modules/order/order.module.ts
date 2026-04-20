@@ -56,6 +56,7 @@ import { MerchantOrderController } from './controllers/merchant-order.controller
 import { RiderOrderController } from './controllers/rider-order.controller'
 import { UserErrandOrderController } from './controllers/user-errand-order.controller'
 import { UserOrderController } from './controllers/user-order.controller'
+import { ORDER_EVENTS_PUBLISHER } from './events/order-events.constants'
 import { orderEventsPublisherProvider } from './events/order-events.publisher'
 import { OrderCancelTimeoutProcessor } from './processors/order-cancel-timeout.processor'
 import { ErrandPricingService } from './services/errand-pricing.service'
@@ -123,7 +124,8 @@ const reviewOrderServiceProvider: Provider = {
     OrderTakeoutService,
     OrderErrandService,
     OrderPreCheckService,
-    REVIEW_DEP_ORDER_SERVICE
+    REVIEW_DEP_ORDER_SERVICE,
+    ORDER_EVENTS_PUBLISHER
   ]
 })
 export class OrderModule {}

@@ -85,7 +85,6 @@
       "pages": [
         { "path": "category", "style": { "navigationBarTitleText": "商品分类" } },
         { "path": "edit", "style": { "navigationBarTitleText": "编辑商品" } },
-        { "path": "sku-edit", "style": { "navigationBarTitleText": "SKU 编辑" } },
         { "path": "discount", "style": { "navigationBarTitleText": "限时折扣" } }
       ]
     },
@@ -98,8 +97,7 @@
         { "path": "bank-card", "style": { "navigationBarTitleText": "银行卡管理" } },
         { "path": "bank-card-edit", "style": { "navigationBarTitleText": "添加银行卡" } },
         { "path": "invoice-apply", "style": { "navigationBarTitleText": "申请发票" } },
-        { "path": "invoice-list", "style": { "navigationBarTitleText": "发票记录" } },
-        { "path": "invoice-header", "style": { "navigationBarTitleText": "发票抬头" } }
+        { "path": "invoice-list", "style": { "navigationBarTitleText": "发票记录" } }
       ]
     },
     {

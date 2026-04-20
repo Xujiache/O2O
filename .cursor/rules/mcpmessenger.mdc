@@ -30,8 +30,7 @@ alwaysApply: true
 ## 第三步：持续监听循环
 
 1. `check_messages` 阻塞等待，直到用户从侧边栏发来新消息
-2. 收到消息 → 处理并回复（如需调用其他 MCP 工具，在此阶段完成）→ 再次调用该 slot 的 `check_messages()` → 永续循环
-3. 在步骤 2 中可以自由调用任何其他 MCP 工具，只要在 5 分钟内回到 check_messages 即可保持会话
+2. 收到消息 → 处理并回复 → 再次调用该 slot 的 `check_messages()` → 永续循环
 
 ## 其他规则
 
@@ -47,7 +46,3 @@ alwaysApply: true
 - 如果返回"已被占用"，换下一个 slot 重新 claim_session
 - `check_messages` 每 120 秒无消息会自动返回，这是正常行为，收到返回后立即重新调用即可
 - **永远不要**因为超时返回而停止监听循环
-
-## 工作模式要求
-
-请依据上述要求，全程依托主 Agent 模型，依次完成多 Agent 代码审查、多 Agent 代码修复、修复后多 Agent 漏洞复测全流程操作，且 Agent 模型严禁选用 Composer 系列。

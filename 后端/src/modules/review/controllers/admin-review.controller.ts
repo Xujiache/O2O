@@ -18,8 +18,8 @@ import {
   ApiTags
 } from '@nestjs/swagger'
 import { type PageResult } from '@/common'
-import { CurrentUser, UserTypes } from '@/modules/auth/decorators'
-import { JwtAuthGuard, UserTypeGuard } from '@/modules/auth/guards'
+import { CurrentUser, Permissions, UserTypes } from '@/modules/auth/decorators'
+import { JwtAuthGuard, PermissionGuard, UserTypeGuard } from '@/modules/auth/guards'
 import { AfterSaleVo, QueryAfterSaleDto, ResolveAfterSaleDto } from '../dto/after-sale.dto'
 import { ArbitrationVo, JudgeArbitrationDto, QueryArbitrationDto } from '../dto/arbitration.dto'
 import {
@@ -48,7 +48,8 @@ import { TicketService } from '../services/ticket.service'
 
 @ApiTags('评价&售后 - 管理端')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('review:manage')
 @UserTypes('admin')
 @Controller('admin')
 export class AdminReviewController {

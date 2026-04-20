@@ -67,10 +67,6 @@
     {
       "root": "pages-hall",
       "pages": [
-        {
-          "path": "preference",
-          "style": { "navigationBarTitleText": "接单偏好" }
-        },
         { "path": "detail", "style": { "navigationBarTitleText": "订单详情" } }
       ]
     },

@@ -81,7 +81,7 @@ export default () => ({
     port: parseInt(process.env.TIMESCALE_PORT ?? '5432', 10),
     database: process.env.TIMESCALE_DB ?? 'o2o_timescale',
     username: process.env.TIMESCALE_USER ?? 'o2o_ts',
-    password: process.env.TIMESCALE_PASS ?? 'o2o_ts_2026',
+    password: process.env.TIMESCALE_PASS ?? '',
     poolMax: parseInt(process.env.TIMESCALE_POOL_MAX ?? '10', 10)
   },
   thirdParty: {

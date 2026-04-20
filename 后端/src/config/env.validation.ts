@@ -86,7 +86,11 @@ export const envValidationSchema = Joi.object({
   TIMESCALE_PORT: Joi.number().port().default(5432),
   TIMESCALE_DB: Joi.string().default('o2o_timescale'),
   TIMESCALE_USER: Joi.string().default('o2o_ts'),
-  TIMESCALE_PASS: Joi.string().allow('').default('o2o_ts_2026'),
+  TIMESCALE_PASS: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().min(8).required(),
+    otherwise: Joi.string().allow('').default('')
+  }),
   TIMESCALE_POOL_MAX: Joi.number().integer().min(1).max(100).default(10),
 
   // P3 / 加密密钥（CryptoUtil 用，员工 A 落地后会做强校验，本期允许空）

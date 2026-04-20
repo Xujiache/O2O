@@ -40,6 +40,8 @@ import {
   resolvePayChannel,
   type PayerClientType
 } from '../types/payment.types'
+import { OrderService } from '@/modules/order/services/order.service'
+import { OrderTypeEnum } from '@/modules/order/types/order.types'
 import { BalanceService, type BalancePayResult } from './balance.service'
 import { PAYMENT_EVENTS_PUBLISHER, type PaymentEventsPublisher } from './payment-events.publisher'
 import { PaymentStateMachine } from './payment-state-machine'
@@ -129,7 +131,8 @@ export class PaymentService {
     private readonly stateMachine: PaymentStateMachine,
     private readonly balanceService: BalanceService,
     @Inject(PAYMENT_EVENTS_PUBLISHER)
-    private readonly publisher: PaymentEventsPublisher
+    private readonly publisher: PaymentEventsPublisher,
+    private readonly orderService: OrderService
   ) {}
 
   /* ============================================================================
@@ -191,6 +194,20 @@ export class PaymentService {
         BizErrorCode.SYSTEM_CONFIG_MISSING,
         `未注册 PayMethod=${input.payMethod} 的适配器`
       )
+    }
+
+    /* 1.5 校验支付金额与订单应付金额一致（防篡改） */
+    const orderType = input.orderType === 1 ? OrderTypeEnum.TAKEOUT : OrderTypeEnum.ERRAND
+    const orderCore = await this.orderService.findCoreByOrderNo(input.orderNo, orderType)
+    const orderPayAmount = new BigNumber(orderCore.payAmount)
+    if (!amountBn.isEqualTo(orderPayAmount)) {
+      throw new BusinessException(
+        BizErrorCode.PARAM_INVALID,
+        `支付金额(${input.amount})与订单应付金额(${orderCore.payAmount})不一致`
+      )
+    }
+    if (orderCore.userId !== input.userId) {
+      throw new BusinessException(BizErrorCode.BIZ_ORDER_NOT_OWNED, '非本人订单，禁止支付')
     }
 
     /* 2. 防重复 + 幂等复用 */

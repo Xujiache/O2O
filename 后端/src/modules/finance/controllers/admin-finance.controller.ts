@@ -34,8 +34,8 @@ import {
 } from '@nestjs/swagger'
 import { type Response } from 'express'
 import { type PageResult } from '@/common'
-import { CurrentUser, UserTypes } from '@/modules/auth/decorators'
-import { JwtAuthGuard, UserTypeGuard } from '@/modules/auth/guards'
+import { CurrentUser, Permissions, UserTypes } from '@/modules/auth/decorators'
+import { JwtAuthGuard, PermissionGuard, UserTypeGuard } from '@/modules/auth/guards'
 import { OperationLogService } from '@/modules/user/services/operation-log.service'
 import { type AccountVo, type AdjustBalanceDto, type FlowVo } from '../dto/account.dto'
 import {
@@ -66,7 +66,8 @@ import { WithdrawService } from '../services/withdraw.service'
 
 @ApiTags('财务 - 管理端')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('finance:manage')
 @UserTypes('admin')
 @Controller('admin')
 export class AdminFinanceController {

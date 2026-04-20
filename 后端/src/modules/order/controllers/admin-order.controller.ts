@@ -21,8 +21,10 @@ import {
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { CurrentUser, type AuthUser } from '@/modules/auth/decorators/current-user.decorator'
+import { Permissions } from '@/modules/auth/decorators/permissions.decorator'
 import { UserTypes } from '@/modules/auth/decorators/user-types.decorator'
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard'
+import { PermissionGuard } from '@/modules/auth/guards/permission.guard'
 import { UserTypeGuard } from '@/modules/auth/guards/user-type.guard'
 import { type AdminArbitrateDto, type AdminForceCancelDto } from '../dto/order-cancel.dto'
 import { type AdminOrderQueryDto, type OrderKeysetPageVo } from '../dto/order-query.dto'
@@ -31,7 +33,8 @@ import { OrderService } from '../services/order.service'
 
 @ApiTags('订单 - 管理端')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('order:manage')
 @UserTypes('admin')
 @Controller()
 export class AdminOrderController {

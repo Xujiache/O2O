@@ -3,6 +3,13 @@
 -->
 <template>
   <div class="biz-finance-reconciliation">
+    <ElAlert
+      title="对账功能将在系统联调后完整启用，当前展示分账记录概览数据"
+      type="info"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 12px"
+    />
     <BizTable
       ref="tableRef"
       :columns="columns"
@@ -16,6 +23,7 @@
 
 <script setup lang="ts">
   import { ref } from 'vue'
+  import { ElAlert } from 'element-plus'
   import { financeApi } from '@/api/business'
   import type { BizSettlementRecord, BizListParams } from '@/types/business'
   import { BizTable } from '@/components/biz'

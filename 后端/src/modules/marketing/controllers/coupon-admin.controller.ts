@@ -30,8 +30,8 @@ import {
   ApiTags
 } from '@nestjs/swagger'
 import { type PageResult } from '@/common'
-import { CurrentUser, UserTypes } from '@/modules/auth/decorators'
-import { JwtAuthGuard, UserTypeGuard } from '@/modules/auth/guards'
+import { CurrentUser, Permissions, UserTypes } from '@/modules/auth/decorators'
+import { JwtAuthGuard, PermissionGuard, UserTypeGuard } from '@/modules/auth/guards'
 import { CouponVo, CreateCouponDto, QueryCouponDto, UpdateCouponDto } from '../dto/coupon.dto'
 import { IssueCouponDto, IssueResultVo } from '../dto/user-coupon.dto'
 import { CouponService } from '../services/coupon.service'
@@ -39,7 +39,8 @@ import { UserCouponService } from '../services/user-coupon.service'
 
 @ApiTags('营销 - 优惠券（管理端）')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('marketing:coupon')
 @UserTypes('admin')
 @Controller('admin/coupons')
 export class CouponAdminController {

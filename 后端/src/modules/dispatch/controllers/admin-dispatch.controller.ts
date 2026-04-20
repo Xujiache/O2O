@@ -30,8 +30,9 @@ import { Type } from 'class-transformer'
 import { IsInt, Max, Min } from 'class-validator'
 import { type PageResult } from '@/common'
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator'
+import { Permissions } from '@/modules/auth/decorators/permissions.decorator'
 import { UserTypes } from '@/modules/auth/decorators/user-types.decorator'
-import { JwtAuthGuard, UserTypeGuard } from '@/modules/auth/guards'
+import { JwtAuthGuard, PermissionGuard, UserTypeGuard } from '@/modules/auth/guards'
 import { OperationLogService } from '@/modules/user/services/operation-log.service'
 import { DashboardQueryDto, DashboardVo } from '../dto/dashboard.dto'
 import { DispatchListQueryDto, DispatchRecordVo, ManualDispatchDto } from '../dto/dispatch.dto'
@@ -65,7 +66,8 @@ export class ManualDispatchBodyDto extends ManualDispatchDto {
 
 @ApiTags('管理后台 - 派单 & 转单')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('dispatch:manage')
 @UserTypes('admin')
 @Controller('admin')
 export class AdminDispatchController {

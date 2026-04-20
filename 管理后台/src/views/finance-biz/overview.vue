@@ -56,7 +56,7 @@
 
 <script setup lang="ts">
   import { ref, computed, onMounted } from 'vue'
-  import { ElCard, ElRow, ElCol, vLoading } from 'element-plus'
+  import { ElCard, ElRow, ElCol, ElMessage, vLoading } from 'element-plus'
   import { financeApi } from '@/api/business'
   import { BizChart } from '@/components/biz'
   import { formatAmount } from '@/utils/business/format'
@@ -110,6 +110,8 @@
     loading.value = true
     try {
       data.value = (await financeApi.overview()) as FinanceOverview
+    } catch (e) {
+      ElMessage.error((e as Error)?.message || '加载财务概览失败')
     } finally {
       loading.value = false
     }

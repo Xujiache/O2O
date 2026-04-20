@@ -32,8 +32,10 @@ import {
 } from '@nestjs/swagger'
 import { type PageResult } from '@/common'
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator'
+import { Permissions } from '@/modules/auth/decorators/permissions.decorator'
 import { UserTypes } from '@/modules/auth/decorators/user-types.decorator'
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard'
+import { PermissionGuard } from '@/modules/auth/guards/permission.guard'
 import { UserTypeGuard } from '@/modules/auth/guards/user-type.guard'
 import { OperationLogService } from '@/modules/user/services/operation-log.service'
 import {
@@ -48,7 +50,8 @@ import { PromotionService } from '../services/promotion.service'
 
 @ApiTags('营销 - 管理端活动')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, UserTypeGuard)
+@UseGuards(JwtAuthGuard, UserTypeGuard, PermissionGuard)
+@Permissions('marketing:promotion')
 @UserTypes('admin')
 @Controller('admin/promotions')
 export class PromotionAdminController {
