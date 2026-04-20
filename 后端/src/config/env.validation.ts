@@ -33,9 +33,14 @@ export const envValidationSchema = Joi.object({
   REDIS_PASS: Joi.string().allow('').default(''),
   REDIS_DB: Joi.number().integer().min(0).max(15).default(0),
 
-  // JWT（生产环境必须设置，开发可用默认占位）
-  JWT_SECRET: Joi.string().min(16).required(),
+  // JWT（生产环境 ≥ 64 位，开发 ≥ 16 位）
+  JWT_SECRET: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().min(64).required(),
+    otherwise: Joi.string().min(16).required()
+  }),
   JWT_EXPIRES_IN: Joi.number().integer().positive().default(7200),
+  JWT_VER_FAIL_MODE: Joi.string().valid('open', 'close').default('close'),
 
   // RabbitMQ（P3 阶段启用，P1 允许为空）
   RABBITMQ_URL: Joi.string().allow('').default(''),

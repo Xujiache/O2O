@@ -30,7 +30,8 @@ export default () => ({
   },
   jwt: {
     secret: process.env.JWT_SECRET ?? '',
-    expiresIn: parseInt(process.env.JWT_EXPIRES_IN ?? '7200', 10)
+    expiresIn: parseInt(process.env.JWT_EXPIRES_IN ?? '7200', 10),
+    verFailMode: process.env.JWT_VER_FAIL_MODE ?? 'close'
   },
   rabbitmq: {
     url: process.env.RABBITMQ_URL ?? '',
@@ -60,7 +61,10 @@ export default () => ({
     useSSL: (process.env.OSS_USE_SSL ?? 'true') === 'true',
     accessKey: process.env.OSS_ACCESS_KEY_ID ?? '',
     secretKey: process.env.OSS_ACCESS_KEY_SECRET ?? '',
-    region: process.env.OSS_REGION ?? 'oss-cn-hangzhou'
+    region: process.env.OSS_REGION ?? 'oss-cn-hangzhou',
+    stsAccessKeyId: process.env.OSS_STS_ACCESS_KEY_ID ?? '',
+    stsAccessKeySecret: process.env.OSS_STS_ACCESS_KEY_SECRET ?? '',
+    ramRoleArn: process.env.OSS_RAM_ROLE_ARN ?? ''
   },
   // ===== P3 / 地图服务（员工 C 新增）=====
   map: {
@@ -92,6 +96,21 @@ export default () => ({
     pushProvider: process.env.PUSH_PROVIDER ?? 'jpush',
     mapProvider: process.env.MAP_PROVIDER ?? 'amap',
     mapAk: process.env.MAP_AK ?? ''
+  },
+  // ===== P3/T3.4 管理后台签名 =====
+  adminSign: {
+    appKey: process.env.ADMIN_SIGN_APP_KEY ?? '',
+    appSecret: process.env.ADMIN_SIGN_APP_SECRET ?? '',
+    appKeys: process.env.ADMIN_APP_KEYS ?? ''
+  },
+  // ===== P3 / 加密 =====
+  encryption: {
+    currentKeyVer: parseInt(process.env.CURRENT_ENC_KEY_VER ?? '1', 10),
+    encKeyV1: process.env.ENC_KEY_V1 ?? '',
+    hmacKeyV1: process.env.HMAC_KEY_V1 ?? ''
+  },
+  snowflake: {
+    workerId: process.env.SNOWFLAKE_WORKER_ID ?? ''
   },
   log: {
     level: process.env.LOG_LEVEL ?? 'info'

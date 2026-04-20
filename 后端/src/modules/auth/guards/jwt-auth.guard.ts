@@ -10,8 +10,8 @@
  *   - 验签失败 / payload 异常 → 抛 BusinessException 统一编码
  *
  * 注册方式：
- *   - 全局：app.module.ts providers 加 { provide: APP_GUARD, useClass: JwtAuthGuard }
- *   - 单 controller：@UseGuards(JwtAuthGuard)
+ *   - 已全局注册，见 app.module.ts providers → { provide: APP_GUARD, useClass: JwtAuthGuard }
+ *   - 公开接口使用 @Public() 跳过鉴权
  */
 
 import { ExecutionContext, Injectable } from '@nestjs/common'

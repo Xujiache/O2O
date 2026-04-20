@@ -28,6 +28,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { BizErrorCode, BusinessException } from '@/common'
 import { PaymentRecord } from '@/entities'
+import BigNumber from 'bignumber.js'
 import { SnowflakeId } from '@/utils'
 import {
   PAYMENT_ADAPTER_REGISTRY,
@@ -158,10 +159,11 @@ export class PaymentService {
     if (!input.userId) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, 'userId 必填')
     }
-    if (!input.amount || Number.isNaN(Number(input.amount))) {
+    const amountBn = new BigNumber(input.amount ?? '')
+    if (amountBn.isNaN() || !amountBn.isFinite()) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, `amount 非法：${input.amount}`)
     }
-    if (Number(input.amount) <= 0) {
+    if (amountBn.isLessThanOrEqualTo(0)) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, 'amount 必须 > 0')
     }
     if (![1, 2].includes(input.orderType)) {

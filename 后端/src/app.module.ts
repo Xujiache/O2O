@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import configuration from './config/configuration'
 import { envValidationSchema } from './config/env.validation'
 import {
@@ -14,6 +14,7 @@ import { DatabaseModule } from './database/database.module'
 import { QueuesModule } from './queues/queues.module'
 import { HealthModule } from './health/health.module'
 // ========== 业务模块（P3~P4 阶段逐步填充实现，P1 仅保留占位 Module） ==========
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { AuthModule } from './modules/auth/auth.module'
 import { UserModule } from './modules/user/user.module'
 import { MessageModule } from './modules/message/message.module'
@@ -31,6 +32,7 @@ import { OrchestrationModule } from './modules/orchestration/orchestration.modul
 import { AdminModule } from './modules/admin/admin.module'
 import { StatsModule } from './modules/stats/stats.module'
 import { CustomerModule } from './modules/customer/customer.module'
+import { SysConfigModule } from './modules/system/sys-config.module'
 
 /**
  * 根模块
@@ -71,9 +73,12 @@ import { CustomerModule } from './modules/customer/customer.module'
     OrchestrationModule,
     AdminModule,
     StatsModule,
-    CustomerModule
+    CustomerModule,
+    SysConfigModule
   ],
   providers: [
+    /* 全局 JWT 鉴权守卫：默认拦截所有路由，@Public() 装饰的除外 */
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     /* 全局异常过滤器：HttpException 走专用 filter（含 BusinessException），其余走兜底 filter */
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -1,4 +1,5 @@
 import { Controller, Get, Inject } from '@nestjs/common'
+import { Public } from '../modules/auth/decorators/public.decorator'
 import {
   HealthCheck,
   HealthCheckResult,
@@ -18,6 +19,7 @@ import { REDIS_CLIENT } from './redis.provider'
  * 用途：K8s / Prometheus / uptime 监控探活；对齐 DESIGN_P1 §4.3 & ACCEPTANCE V1.8
  */
 @ApiTags('系统')
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(

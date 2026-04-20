@@ -85,7 +85,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
     } catch (err) {
       if (err instanceof BusinessException) throw err
-      this.logger.warn(`Redis 取 token ver 失败：${(err as Error).message}；放行（fail-open）`)
+      const failMode = this.config.get<string>('jwt.verFailMode', 'close')
+      if (failMode === 'close') {
+        this.logger.error(
+          `Redis 取 token ver 失败（fail-close 模式拒绝）：${(err as Error).message}`
+        )
+        throw new BusinessException(BizErrorCode.AUTH_TOKEN_INVALID, 'Token 校验服务暂不可用')
+      }
+      this.logger.warn(`Redis 取 token ver 失败（fail-open 模式放行）：${(err as Error).message}`)
     }
 
     return {
