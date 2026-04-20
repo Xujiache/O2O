@@ -107,7 +107,7 @@
   import { getOrderDetail, applyAfterSale } from '@/api/order'
   import { uploadImages } from '@/api/file'
   import type { OrderTakeout, OrderErrand } from '@/types/biz'
-  import { formatAmount } from '@/utils/format'
+  import { formatAmount, compareAmount } from '@/utils/format'
   import { logger } from '@/utils/logger'
   import { track, TRACK } from '@/utils/track'
 
@@ -155,8 +155,8 @@
     return (
       !!order.value &&
       reasonIndex.value >= 0 &&
-      parseFloat(refundAmount.value || '0') > 0 &&
-      parseFloat(refundAmount.value || '0') <= parseFloat(maxAmount.value)
+      compareAmount(refundAmount.value || '0', '0') > 0 &&
+      compareAmount(refundAmount.value || '0', maxAmount.value) <= 0
     )
   })
 
@@ -165,13 +165,12 @@
   }
 
   function clampAmount() {
-    const v = parseFloat(refundAmount.value || '0')
-    const max = parseFloat(maxAmount.value)
-    if (Number.isNaN(v) || v < 0) {
+    const v = refundAmount.value || '0'
+    if (compareAmount(v, '0') < 0) {
       refundAmount.value = '0.00'
       return
     }
-    if (v > max) {
+    if (compareAmount(v, maxAmount.value) > 0) {
       refundAmount.value = maxAmount.value
       uni.showToast({ title: `最多退款 ¥${maxAmount.value}`, icon: 'none' })
     }

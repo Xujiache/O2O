@@ -73,7 +73,7 @@
   import { computed, ref } from 'vue'
   import { onLoad, onShow, onPullDownRefresh } from '@dcloudio/uni-app'
   import { useAuthStore, useDispatchStore } from '@/store'
-  import { formatAmount, formatDistance } from '@/utils/format'
+  import { formatAmount, formatDistance, compareAmount } from '@/utils/format'
   import { logger } from '@/utils/logger'
   import { track, TRACK } from '@/utils/track'
 
@@ -112,7 +112,7 @@
     arr.sort((a, b) => {
       switch (sortVal) {
         case 'fee':
-          return Number(b.deliveryFee) - Number(a.deliveryFee)
+          return compareAmount(b.deliveryFee, a.deliveryFee)
         case 'route':
           return (b.routeScore ?? 0) - (a.routeScore ?? 0)
         default:

@@ -177,6 +177,7 @@ function rawRequest<T = unknown>(opt: RequestOptions): Promise<T> {
     const token = getStorage<string>(STORAGE_KEYS.TOKEN)
     const headers: Record<string, string> = {
       'Content-Type': 'application/json; charset=utf-8',
+      'X-Client-Type': 'user',
       ...(opt.extraHeaders ?? {}),
       ...(opt.headers ?? {})
     }

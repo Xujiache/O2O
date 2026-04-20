@@ -172,18 +172,7 @@
         ...params,
         cursor: cursor.value ?? undefined
       })
-      /**
-       * 客户端兜底过滤（I-01 R1）：
-       * 后端 listOrders 当前不支持服务端 isReviewed 筛选（待 P9 后端补）
-       * 本轮在前端按 Tab 设定的 isReviewed 做客户端过滤，确保"待评价"vs"已完成"数据不重复
-       * 副作用：当一页数据中 status=55 但 isReviewed 不匹配时，单页可能少于 pageSize
-       *         这是临时方案；P9 后端补字段后即可移除此段
-       */
-      const filteredList =
-        params.isReviewed !== undefined
-          ? r.list.filter((o) => (o.isReviewed ?? 0) === params.isReviewed)
-          : r.list
-      orders.value = reset ? filteredList : [...orders.value, ...filteredList]
+      orders.value = reset ? r.list : [...orders.value, ...r.list]
       cursor.value = r.nextCursor ?? null
       hasMore.value = r.hasMore
     } catch (e) {

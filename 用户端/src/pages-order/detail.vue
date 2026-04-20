@@ -151,20 +151,20 @@
             <text>起步价</text>
             <text>{{ formatAmount(order.baseFee) }}</text>
           </view>
-          <view v-if="parseFloat(order.distanceFee) > 0" class="order-detail__amt-row">
+          <view v-if="compareAmount(order.distanceFee, '0') > 0" class="order-detail__amt-row">
             <text>距离费</text>
             <text>{{ formatAmount(order.distanceFee) }}</text>
           </view>
-          <view v-if="parseFloat(order.weightFee) > 0" class="order-detail__amt-row">
+          <view v-if="compareAmount(order.weightFee, '0') > 0" class="order-detail__amt-row">
             <text>重量费</text>
             <text>{{ formatAmount(order.weightFee) }}</text>
           </view>
-          <view v-if="parseFloat(order.serviceFee) > 0" class="order-detail__amt-row">
+          <view v-if="compareAmount(order.serviceFee, '0') > 0" class="order-detail__amt-row">
             <text>服务费</text>
             <text>{{ formatAmount(order.serviceFee) }}</text>
           </view>
           <view
-            v-if="order.insuranceFee && parseFloat(order.insuranceFee) > 0"
+            v-if="order.insuranceFee && compareAmount(order.insuranceFee, '0') > 0"
             class="order-detail__amt-row"
           >
             <text>保价费</text>
@@ -257,7 +257,7 @@
   import { ws } from '@/utils/ws'
   import { ORDER_STATUS_TEXT } from '@/types/biz'
   import type { OrderTakeout, OrderErrand, OrderStatus, ErrandServiceType } from '@/types/biz'
-  import { formatAmount, formatTime, maskMobile } from '@/utils/format'
+  import { formatAmount, formatTime, maskMobile, compareAmount } from '@/utils/format'
   import { logger } from '@/utils/logger'
   import { track, TRACK } from '@/utils/track'
 
@@ -429,7 +429,7 @@
   }
 
   function hasDiscount(amount: string | null | undefined): boolean {
-    return !!amount && parseFloat(amount) > 0
+    return !!amount && compareAmount(amount, '0') > 0
   }
 
   /** 状态描述 */
