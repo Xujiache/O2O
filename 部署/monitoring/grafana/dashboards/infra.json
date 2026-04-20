@@ -1,0 +1,53 @@
+{
+  "dashboard": {
+    "title": "O2O 基础设施",
+    "uid": "o2o-infra",
+    "timezone": "Asia/Shanghai",
+    "refresh": "15s",
+    "panels": [
+      {
+        "title": "节点 CPU 使用率",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [{ "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{instance}}" }],
+        "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } }
+      },
+      {
+        "title": "节点内存使用率",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [{ "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100", "legendFormat": "{{instance}}" }],
+        "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } }
+      },
+      {
+        "title": "磁盘使用率",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [{ "expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"}) * 100", "legendFormat": "{{instance}}" }],
+        "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } }
+      },
+      {
+        "title": "网络流量",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          { "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*\"}[5m]) / 1024 / 1024", "legendFormat": "{{instance}} RX (MB/s)" },
+          { "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*\"}[5m]) / 1024 / 1024", "legendFormat": "{{instance}} TX (MB/s)" }
+        ]
+      },
+      {
+        "title": "Pod CPU 使用",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [{ "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"o2o\"}[5m]))", "legendFormat": "{{pod}}" }]
+      },
+      {
+        "title": "Pod 内存使用",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [{ "expr": "sum by (pod) (container_memory_usage_bytes{namespace=\"o2o\"}) / 1024 / 1024", "legendFormat": "{{pod}}" }],
+        "fieldConfig": { "defaults": { "unit": "MiB" } }
+      }
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "dashboard": {
+    "title": "O2O 业务 KPI",
+    "uid": "o2o-business-kpi",
+    "timezone": "Asia/Shanghai",
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "订单创建速率",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "targets": [{ "expr": "sum(rate(order_created_total[5m])) * 60", "legendFormat": "orders/min" }]
+      },
+      {
+        "title": "支付成功率",
+        "type": "gauge",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "targets": [{ "expr": "sum(rate(order_paid_total[1h])) / sum(rate(order_created_total[1h]))", "legendFormat": "Pay Rate" }],
+        "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [{ "value": 0, "color": "red" }, { "value": 0.95, "color": "yellow" }, { "value": 0.98, "color": "green" }] } } }
+      },
+      {
+        "title": "GMV (预估)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "targets": [{ "expr": "sum(increase(order_paid_total[24h])) * 25", "legendFormat": "GMV" }],
+        "fieldConfig": { "defaults": { "unit": "currencyCNY" } }
+      },
+      {
+        "title": "骑手上报频次",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "targets": [{ "expr": "sum(rate(rider_location_reports_total[5m]))", "legendFormat": "reports/s" }]
+      },
+      {
+        "title": "订单趋势（外卖 vs 跑腿）",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "targets": [
+          { "expr": "sum(rate(order_created_total{type=\"takeout\"}[5m])) * 60", "legendFormat": "外卖" },
+          { "expr": "sum(rate(order_created_total{type=\"errand\"}[5m])) * 60", "legendFormat": "跑腿" }
+        ]
+      },
+      {
+        "title": "派单决策耗时",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "targets": [
+          { "expr": "histogram_quantile(0.5, sum(rate(dispatch_decision_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P50" },
+          { "expr": "histogram_quantile(0.95, sum(rate(dispatch_decision_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P95" }
+        ]
+      },
+      {
+        "title": "RPC 失败",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+        "targets": [{ "expr": "sum by (service, reason) (rate(business_rpc_failure_total[5m]))", "legendFormat": "{{service}}-{{reason}}" }]
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+# ============================================================================
+# Helm 模板 — ConfigMap
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: {{ .Release.Namespace }}
+data:
+  NODE_ENV: "production"
+  APP_PORT: "{{ .Values.backend.port }}"
+  APP_PREFIX: "/api/v1"
+  DB_HOST: "{{ .Values.mysql.host }}"
+  DB_PORT: "{{ .Values.mysql.port }}"
+  DB_NAME: "{{ .Values.mysql.database }}"
+  DB_SYNCHRONIZE: "false"
+  DB_LOGGING: "false"
+  REDIS_HOST: "{{ .Values.redis.host }}"
+  REDIS_PORT: "{{ .Values.redis.port }}"
+  MINIO_ENDPOINT: "{{ .Values.minio.endpoint }}"
+  MINIO_PORT: "{{ .Values.minio.port }}"
+  MINIO_BUCKET: "{{ .Values.minio.bucket }}"

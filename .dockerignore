@@ -1,0 +1,22 @@
+# ============================================================================
+# .dockerignore — 减少 Docker 上下文体积
+# ============================================================================
+node_modules
+**/node_modules
+.git
+.github
+.vscode
+.cursor
+*.log
+docs
+dump.rdb
+coverage
+.env*
+!.env.example
+**/.vite
+**/dist
+**/unpackage
+**/*.spec.ts
+**/*.test.ts
+playwright-report
+test-results

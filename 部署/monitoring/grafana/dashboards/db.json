@@ -1,0 +1,60 @@
+{
+  "dashboard": {
+    "title": "O2O 数据库监控",
+    "uid": "o2o-db",
+    "timezone": "Asia/Shanghai",
+    "refresh": "15s",
+    "panels": [
+      {
+        "title": "MySQL 连接数",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          { "expr": "mysql_global_status_threads_connected", "legendFormat": "Active" },
+          { "expr": "mysql_global_variables_max_connections", "legendFormat": "Max" }
+        ]
+      },
+      {
+        "title": "慢查询速率",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [{ "expr": "rate(mysql_global_status_slow_queries[5m]) * 60", "legendFormat": "slow/min" }],
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 5, "color": "yellow" }, { "value": 10, "color": "red" }] } } }
+      },
+      {
+        "title": "InnoDB Buffer Pool 命中率",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [{ "expr": "1 - (rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m]))", "legendFormat": "Hit Rate" }],
+        "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+      },
+      {
+        "title": "QPS (Queries/sec)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          { "expr": "rate(mysql_global_status_queries[5m])", "legendFormat": "Total QPS" },
+          { "expr": "rate(mysql_global_status_commands_total{command=\"select\"}[5m])", "legendFormat": "SELECT" },
+          { "expr": "rate(mysql_global_status_commands_total{command=\"insert\"}[5m])", "legendFormat": "INSERT" },
+          { "expr": "rate(mysql_global_status_commands_total{command=\"update\"}[5m])", "legendFormat": "UPDATE" }
+        ]
+      },
+      {
+        "title": "Redis 内存使用",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          { "expr": "redis_memory_used_bytes / 1024 / 1024", "legendFormat": "Used (MB)" },
+          { "expr": "redis_memory_max_bytes / 1024 / 1024", "legendFormat": "Max (MB)" }
+        ]
+      },
+      {
+        "title": "Redis 命中率",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))", "legendFormat": "Hit Rate" }],
+        "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+      }
+    ]
+  }
+}

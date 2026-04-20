@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: o2o-staging
+
+resources:
+  - ../../base
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+      spec:
+        replicas: 2
+        template:
+          spec:
+            containers:
+              - name: backend
+                resources:
+                  requests:
+                    cpu: 250m
+                    memory: 256Mi
+                  limits:
+                    cpu: "1"
+                    memory: 1Gi
+    target:
+      kind: Deployment
+      name: backend
+
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: backend
+      spec:
+        minReplicas: 1
+        maxReplicas: 4
+    target:
+      kind: HorizontalPodAutoscaler
+      name: backend
