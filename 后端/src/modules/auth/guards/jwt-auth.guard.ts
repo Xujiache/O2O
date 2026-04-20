@@ -39,6 +39,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       ctx.getClass()
     ])
     if (isPublic) return true
+
+    /* 基础设施路径白名单：第三方模块控制器无法标注 @Public()，需按路径放行 */
+    const request = ctx.switchToHttp().getRequest()
+    const url: string = request?.url ?? ''
+    if (url.startsWith('/metrics') || url.startsWith('/v1/metrics')) return true
+
     return super.canActivate(ctx) as boolean | Promise<boolean> | Observable<boolean>
   }
 
