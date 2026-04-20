@@ -1,0 +1,8 @@
+apiVersion: v2
+name: o2o
+description: O2O 外卖+跑腿一体化平台 Helm Chart
+type: application
+version: 1.0.0
+appVersion: "0.1.0"
+maintainers:
+  - name: O2O Platform Team

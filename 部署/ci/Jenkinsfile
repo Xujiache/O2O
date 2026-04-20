@@ -1,0 +1,161 @@
+// ============================================================================
+// Jenkinsfile — O2O 平台 CI/CD 流水线
+// 依据 docs/P9_集成测试部署/DESIGN_P9_集成测试部署.md §六
+// ============================================================================
+
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY     = 'registry.example.com/o2o'
+        IMAGE_TAG    = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+        HELM_RELEASE = 'o2o'
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    stages {
+        // ── 1. 拉取代码 ──
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // ── 2. 安装依赖 ──
+        stage('Install') {
+            steps {
+                sh 'corepack enable && pnpm install --frozen-lockfile'
+            }
+        }
+
+        // ── 3. Lint + 单元测试（并行） ──
+        stage('Lint & Test') {
+            parallel {
+                stage('Backend Lint') {
+                    steps {
+                        sh 'pnpm --filter 后端 lint'
+                    }
+                }
+                stage('Backend Test') {
+                    steps {
+                        sh 'pnpm --filter 后端 test:cov'
+                    }
+                    post {
+                        always {
+                            junit 'coverage/junit.xml'
+                            publishHTML(target: [
+                                reportName: 'Coverage',
+                                reportDir: 'coverage/lcov-report',
+                                reportFiles: 'index.html'
+                            ])
+                        }
+                    }
+                }
+                stage('Admin Build') {
+                    steps {
+                        sh 'pnpm --filter 管理后台 build'
+                    }
+                }
+            }
+        }
+
+        // ── 4. 安全扫描 ──
+        stage('Security Scan') {
+            parallel {
+                stage('Trivy Image') {
+                    steps {
+                        sh "docker build -t ${REGISTRY}/backend:${IMAGE_TAG} -f 部署/docker/backend/Dockerfile ."
+                        sh "trivy image --severity HIGH,CRITICAL --exit-code 1 ${REGISTRY}/backend:${IMAGE_TAG}"
+                    }
+                }
+                stage('Snyk Deps') {
+                    steps {
+                        sh 'snyk test --all-projects --severity-threshold=high || true'
+                    }
+                }
+            }
+        }
+
+        // ── 5. 构建镜像 & 推送 ──
+        stage('Build & Push') {
+            steps {
+                sh "docker build -t ${REGISTRY}/backend:${IMAGE_TAG} -f 部署/docker/backend/Dockerfile ."
+                sh "docker build -t ${REGISTRY}/admin:${IMAGE_TAG} -f 部署/docker/admin-web/Dockerfile ."
+                sh "docker push ${REGISTRY}/backend:${IMAGE_TAG}"
+                sh "docker push ${REGISTRY}/admin:${IMAGE_TAG}"
+                // 同时打 latest 标签
+                sh "docker tag ${REGISTRY}/backend:${IMAGE_TAG} ${REGISTRY}/backend:latest"
+                sh "docker tag ${REGISTRY}/admin:${IMAGE_TAG} ${REGISTRY}/admin:latest"
+                sh "docker push ${REGISTRY}/backend:latest"
+                sh "docker push ${REGISTRY}/admin:latest"
+            }
+        }
+
+        // ── 6. 部署 Staging ──
+        stage('Deploy Staging') {
+            steps {
+                sh """
+                    helm upgrade --install ${HELM_RELEASE} 部署/helm/o2o \
+                        -n o2o-staging --create-namespace \
+                        -f 部署/helm/o2o/values-staging.yaml \
+                        --set image.tag=${IMAGE_TAG} \
+                        --wait --timeout 5m
+                """
+            }
+        }
+
+        // ── 7. 冒烟测试 ──
+        stage('Smoke Test') {
+            steps {
+                sh 'bash 部署/ci/scripts/smoke.sh staging'
+            }
+        }
+
+        // ── 8. 人工审批 ──
+        stage('Approval') {
+            when { branch 'main' }
+            steps {
+                input message: '确认部署到生产环境？', ok: '部署'
+            }
+        }
+
+        // ── 9. 部署 Production ──
+        stage('Deploy Production') {
+            when { branch 'main' }
+            steps {
+                sh """
+                    helm upgrade --install ${HELM_RELEASE} 部署/helm/o2o \
+                        -n o2o-production --create-namespace \
+                        -f 部署/helm/o2o/values-production.yaml \
+                        --set image.tag=${IMAGE_TAG} \
+                        --wait --timeout 5m
+                """
+            }
+        }
+
+        // ── 10. 生产冒烟 ──
+        stage('Post Smoke') {
+            when { branch 'main' }
+            steps {
+                sh 'bash 部署/ci/scripts/smoke.sh production'
+            }
+        }
+    }
+
+    post {
+        success {
+            sh 'bash 部署/ci/scripts/notify.sh success'
+        }
+        failure {
+            sh 'bash 部署/ci/scripts/notify.sh failure'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

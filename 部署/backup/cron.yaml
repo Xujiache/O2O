@@ -1,0 +1,38 @@
+# ============================================================================
+# K8s CronJob — MySQL 定时备份
+# ============================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mysql-backup
+  namespace: o2o
+spec:
+  schedule: "0 2 * * *"   # 每日 02:00
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mysql-backup
+              image: mysql:8.0
+              command: ["/bin/bash", "/scripts/mysql-backup.sh"]
+              envFrom:
+                - secretRef:
+                    name: backend-secret
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                - name: backup-storage
+                  mountPath: /backup
+          volumes:
+            - name: scripts
+              configMap:
+                name: backup-scripts
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: backup-pvc

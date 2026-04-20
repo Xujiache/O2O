@@ -1,0 +1,26 @@
+# Production 覆盖值
+replicaCount:
+  backend: 4
+  adminWeb: 2
+
+backend:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPU: 70
+
+ingress:
+  hosts:
+    api: api.o2o.com
+    admin: admin.o2o.com
+  tls:
+    secretName: o2o-prod-tls
+    issuer: letsencrypt-prod

@@ -1,0 +1,71 @@
+# ============================================================================
+# O2O Helm Chart — 默认 values
+# ============================================================================
+
+replicaCount:
+  backend: 4
+  adminWeb: 2
+
+image:
+  registry: registry.example.com/o2o
+  tag: latest
+  pullPolicy: Always
+
+backend:
+  port: 3000
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPU: 70
+
+adminWeb:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    api: api.o2o.com
+    admin: admin.o2o.com
+  tls:
+    secretName: o2o-tls
+    issuer: letsencrypt-prod
+
+mysql:
+  host: mysql.o2o.svc.cluster.local
+  port: 3306
+  database: o2o_platform
+
+redis:
+  host: redis.o2o.svc.cluster.local
+  port: 6379
+
+rabbitmq:
+  host: rabbitmq.o2o.svc.cluster.local
+  port: 5672
+
+minio:
+  endpoint: minio.o2o.svc.cluster.local
+  port: 9000
+  bucket: o2o-files
+
+monitoring:
+  enabled: true
+  prometheus:
+    scrape: true
+    port: 3000
+    path: /metrics

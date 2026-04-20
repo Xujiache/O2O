@@ -1,0 +1,59 @@
+# ============================================================================
+# NetworkPolicy: 最小网络访问原则
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-netpol
+  namespace: o2o
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 只允许 Ingress Controller 和 Prometheus 访问
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 3000
+  egress:
+    # 允许访问 MySQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mysql
+      ports:
+        - port: 3306
+    # 允许访问 Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - port: 6379
+    # 允许访问 RabbitMQ
+    - to:
+        - podSelector:
+            matchLabels:
+              app: rabbitmq
+      ports:
+        - port: 5672
+    # 允许 DNS 解析
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # 允许访问外部 HTTPS（高德 / 微信 / 支付宝）
+    - to: []
+      ports:
+        - port: 443

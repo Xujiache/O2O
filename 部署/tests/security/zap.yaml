@@ -1,0 +1,46 @@
+# ============================================================================
+# OWASP ZAP 自动化扫描配置
+# 运行：docker run -v $(pwd):/zap/wrk owasp/zap2docker-stable zap-api-scan.py -t /zap/wrk/zap.yaml -f openapi
+# ============================================================================
+env:
+  contexts:
+    - name: "O2O API"
+      urls:
+        - "https://staging-api.o2o.com"
+      includePaths:
+        - "https://staging-api.o2o.com/api/v1/.*"
+      excludePaths:
+        - "https://staging-api.o2o.com/health"
+        - "https://staging-api.o2o.com/metrics"
+      authentication:
+        method: "json"
+        parameters:
+          loginPageUrl: "https://staging-api.o2o.com/api/v1/admin/auth/login"
+          loginRequestBody: '{"username":"test@o2o.com","password":"test123"}'
+          tokenRegex: '"token":"([^"]+)"'
+
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+  jobs:
+    - type: "spider"
+      parameters:
+        maxDuration: 5
+        maxDepth: 5
+    - type: "spiderAjax"
+      parameters:
+        maxDuration: 5
+    - type: "passiveScan-wait"
+      parameters:
+        maxDuration: 10
+    - type: "activeScan"
+      parameters:
+        maxRuleDurationInMins: 5
+        maxScanDurationInMins: 30
+    - type: "report"
+      parameters:
+        template: "risk-confidence-html"
+        reportDir: "/zap/wrk/reports"
+        reportFile: "zap-report"

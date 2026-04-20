@@ -1,0 +1,170 @@
+# ============================================================================
+# O2O 跑腿+外卖 平台 Staging 环境全栈编排
+# 依据 docs/P9_集成测试部署/DESIGN_P9_集成测试部署.md
+# 启动：docker compose -f 部署/docker-compose.staging.yml up -d
+# ============================================================================
+
+name: o2o-staging
+
+services:
+  # ── 后端 API ──
+  backend:
+    build:
+      context: ..
+      dockerfile: 部署/docker/backend/Dockerfile
+    container_name: o2o-backend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - ../后端/.env.staging
+    environment:
+      NODE_ENV: staging
+      TZ: Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [o2o]
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ── 管理后台 ──
+  admin-web:
+    build:
+      context: ..
+      dockerfile: 部署/docker/admin-web/Dockerfile
+    container_name: o2o-admin-web
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    networks: [o2o]
+
+  # ── Nginx 网关 ──
+  nginx:
+    build:
+      context: docker/nginx
+      dockerfile: Dockerfile
+    container_name: o2o-nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      - backend
+      - admin-web
+    networks: [o2o]
+
+  # ── MySQL ──
+  mysql:
+    image: mysql:8.0
+    container_name: o2o-mysql-staging
+    restart: unless-stopped
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-o2o_staging_2026}
+      MYSQL_DATABASE: o2o_platform
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --max_connections=500
+      - --innodb_buffer_pool_size=1G
+      - --slow_query_log=ON
+      - --long_query_time=1
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks: [o2o]
+
+  # ── Redis ──
+  redis:
+    image: redis:7-alpine
+    container_name: o2o-redis-staging
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-o2o_redis_staging}', '--appendonly', 'yes', '--maxmemory', '512mb', '--maxmemory-policy', 'allkeys-lru']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-o2o_redis_staging}', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [o2o]
+
+  # ── RabbitMQ ──
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: o2o-rabbitmq-staging
+    restart: unless-stopped
+    hostname: o2o-rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: o2o
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-o2o_rmq_staging}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks: [o2o]
+
+  # ── MinIO ──
+  minio:
+    image: minio/minio:latest
+    container_name: o2o-minio-staging
+    restart: unless-stopped
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    environment:
+      MINIO_ROOT_USER: o2o
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-o2o_minio_staging}
+    command: ['server', '/data', '--console-address', ':9001']
+    volumes:
+      - minio-data:/data
+    networks: [o2o]
+
+volumes:
+  mysql-data:
+    name: o2o-staging-mysql
+  redis-data:
+    name: o2o-staging-redis
+  rabbitmq-data:
+    name: o2o-staging-rabbitmq
+  minio-data:
+    name: o2o-staging-minio
+
+networks:
+  o2o:
+    name: o2o-staging
+    driver: bridge
