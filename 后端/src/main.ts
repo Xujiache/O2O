@@ -181,6 +181,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix(prefix, {
     exclude: [
       '/health',
+      '/metrics',
       '/docs',
       '/docs-json',
       '/docs/user',

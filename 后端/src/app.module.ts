@@ -10,7 +10,7 @@ import {
   TimeoutInterceptor,
   TransformInterceptor
 } from './common'
-import { MetricsModule, MetricsInterceptor } from './metrics'
+import { MetricsModule } from './metrics'
 import { DatabaseModule } from './database/database.module'
 import { QueuesModule } from './queues/queues.module'
 import { HealthModule } from './health/health.module'
@@ -86,7 +86,6 @@ import { SysConfigModule } from './modules/system/sys-config.module'
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     /* 全局拦截器：注入 traceId + 请求日志 → 超时控制 → 响应体统一包裹 */
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
-    { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor }
   ]

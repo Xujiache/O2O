@@ -1,14 +1,19 @@
 import { Module } from '@nestjs/common'
+import { APP_INTERCEPTOR } from '@nestjs/core'
 import {
   PrometheusModule as WilsotoPrometheusModule,
   makeCounterProvider,
   makeHistogramProvider,
 } from '@willsoto/nestjs-prometheus'
+import { MetricsInterceptor } from './metrics.interceptor'
 
 /**
  * Prometheus 指标模块
- * 功能：注册全局 /metrics 端点 + 业务自定义指标
+ * 功能：注册全局 /metrics 端点 + 业务自定义指标 + 全局指标拦截器
  * 依据 docs/P9_集成测试部署/DESIGN_P9_集成测试部署.md §八
+ *
+ * 注意：MetricsInterceptor 必须在本模块内注册为 APP_INTERCEPTOR，
+ *       因为它依赖的 PROM_METRIC_* token 只在本模块上下文中可用。
  */
 @Module({
   imports: [
@@ -62,6 +67,9 @@ import {
       help: 'Total business RPC failures',
       labelNames: ['service', 'reason'],
     }),
+
+    // ── 全局指标拦截器（在此模块注册以访问 PROM_METRIC_* token） ──
+    { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
   ],
   exports: [WilsotoPrometheusModule],
 })
