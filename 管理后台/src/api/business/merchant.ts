@@ -8,6 +8,8 @@
 import { bizApi } from './_request'
 import type { BizListParams, BizListResp, BizMerchant, BizId } from '@/types/business'
 
+const ROOT_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) || '/'
+
 export const merchantApi = {
   /** 商户列表（含审核状态筛选） */
   auditList: (params: BizListParams & { status?: number }) =>
@@ -21,8 +23,11 @@ export const merchantApi = {
   /** 商户列表 */
   list: (params: BizListParams) =>
     bizApi.get<BizListResp<BizMerchant>>('/merchants', params as Record<string, unknown>),
-  /** 商户详情（P9 待后端补 admin 级别详情接口） */
-  detail: (id: BizId) => bizApi.get<BizMerchant & { shops: unknown[] }>(`/merchants/${id}`),
+  /** 商户详情（真实根路由 /merchants/:id） */
+  detail: (id: BizId) =>
+    bizApi.get<BizMerchant & { shops: unknown[] }>(`/merchants/${id}`, undefined, {
+      baseURL: ROOT_BASE_URL
+    }),
   /** 封禁商户（status=0） */
   ban: (id: BizId) => bizApi.put<void>(`/merchants/${id}/status/0`, {}),
   /** 解封商户（status=1） */

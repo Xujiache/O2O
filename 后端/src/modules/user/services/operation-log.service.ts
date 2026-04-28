@@ -15,6 +15,10 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { Admin, OperationLog } from '@/entities'
+import { SnowflakeId } from '@/utils'
 
 /**
  * 写操作日志入参
@@ -46,6 +50,13 @@ export interface WriteOperationLogInput {
 export class OperationLogService {
   private readonly logger = new Logger(OperationLogService.name)
 
+  constructor(
+    @InjectRepository(OperationLog)
+    private readonly operationLogRepo: Repository<OperationLog>,
+    @InjectRepository(Admin)
+    private readonly adminRepo: Repository<Admin>
+  ) {}
+
   /**
    * 写一条操作日志
    * 参数：input WriteOperationLogInput
@@ -53,11 +64,41 @@ export class OperationLogService {
    * 用途：管理后台写操作之前调用（异常不抛出，避免影响主业务）
    */
   async write(input: WriteOperationLogInput): Promise<void> {
-    /* 占位实现：仅 log；后续 B 替换为 operation_log 表入库 */
-    this.logger.log(
-      `[OPLOG] op=${input.opAdminId} mod=${input.module} act=${input.action} ` +
-        `${input.resourceType}#${input.resourceId} ${input.description}`
-    )
-    return Promise.resolve()
+    try {
+      const admin = await this.adminRepo.findOne({
+        where: { id: input.opAdminId, isDeleted: 0 },
+        select: { id: true, nickname: true, username: true }
+      })
+      const entity = this.operationLogRepo.create({
+        id: SnowflakeId.next(),
+        tenantId: 1,
+        opAdminId: input.opAdminId,
+        opAdminName: admin?.nickname ?? admin?.username ?? null,
+        module: input.module,
+        action: input.action,
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        description: input.description,
+        requestMethod: null,
+        requestUrl: null,
+        requestParams: input.extra ?? null,
+        responseCode: null,
+        clientIp: null,
+        userAgent: null,
+        costMs: null,
+        isSuccess: 1,
+        errorMsg: null,
+        isDeleted: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null
+      })
+      await this.operationLogRepo.save(entity)
+    } catch (err) {
+      this.logger.warn(
+        `[OPLOG] persist failed op=${input.opAdminId} mod=${input.module} act=${input.action} ` +
+          `${input.resourceType}#${input.resourceId} err=${(err as Error).message}`
+      )
+    }
   }
 }

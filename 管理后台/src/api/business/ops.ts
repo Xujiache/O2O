@@ -4,7 +4,7 @@
  * 路径对齐后端：
  *   CouponAdminController    → /admin/coupons
  *   PromotionAdminController → /admin/promotions
- *   推送/区域后端暂无 admin 控制器，暂保留路径标记 P9
+ *   AdminOpsController       → /admin/ops/push* /admin/ops/region*
  *
  * @module api/business/ops
  */
@@ -43,7 +43,7 @@ export const opsApi = {
   promotionToggle: (id: BizId, enabled: boolean) =>
     bizApi.put<void>(`/promotions/${id}/status`, { status: enabled ? 1 : 2 }),
 
-  /** 推送（P9 待后端补 admin 控制器，暂保留路径） */
+  /** 推送任务 */
   pushList: (params: BizListParams) =>
     bizApi.get<BizListResp<BizPushTask>>('/ops/push/list', params as Record<string, unknown>),
   pushSave: (data: Partial<BizPushTask>) =>
@@ -61,7 +61,7 @@ export const opsApi = {
     content: string
   }) => bizApi.post<{ id: BizId }>('/ops/push-template', data, { needSign: true }),
 
-  /** 区域（P9 待后端补 admin 控制器，暂保留路径） */
+  /** 区域配置 */
   regionList: () => bizApi.get<BizRegion[]>('/ops/region/list'),
   regionSave: (data: Partial<BizRegion>) =>
     bizApi.put<void>(`/ops/region/${data.cityCode}`, data, { needSign: true }),

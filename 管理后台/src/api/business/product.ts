@@ -19,7 +19,7 @@ export const productApi = {
     } as Record<string, unknown>),
   /** 强制下架（P9 待后端补接口） */
   forceOffline: (id: BizId, reason: string) =>
-    bizApi.post<void>(`/products/${id}/force-offline`, { reason }, { needSign: true }),
+    bizApi.post<void>(`/products/${id}/force-off`, { reason }, { needSign: true }),
   /** 商品分类（P9 待后端补 admin 级别分类接口） */
   categoryList: () => bizApi.get<Array<{ id: BizId; name: string }>>('/product/category/list'),
   categoryCreate: (name: string) => bizApi.post<{ id: BizId }>('/product/category', { name }),

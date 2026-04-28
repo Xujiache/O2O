@@ -127,14 +127,13 @@
       label: '批量封禁',
       type: 'danger',
       onClick: async (selected) => {
-        const reason = '批量封禁'
         let ok = 0
         let fail = 0
         for (const item of selected) {
           const u = asUser(item)
           if (u.status === 2) continue
           try {
-            await userApi.ban(u.id, reason)
+            await userApi.ban(u.id)
             ok++
           } catch {
             fail++
@@ -153,7 +152,7 @@
   async function onBanConfirm() {
     if (!currentUser.value) return
     try {
-      await userApi.ban(currentUser.value.id, '管理员封禁')
+      await userApi.ban(currentUser.value.id)
       ElMessage.success(`已封禁 ${currentUser.value.nickname}`)
       banVisible.value = false
       tableRef.value?.reload()

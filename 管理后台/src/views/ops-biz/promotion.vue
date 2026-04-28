@@ -95,7 +95,7 @@
     newUser: '新客'
   }
   function typeLabel(t?: string) {
-    return t ? typeMap[t] ?? t : ''
+    return t ? (typeMap[t] ?? t) : ''
   }
 
   const searchSchema = [

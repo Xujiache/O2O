@@ -213,12 +213,6 @@ const mockMenus: BizMenu[] = [
       },
       { code: 'shop:list', path: 'shop-list', name: 'BizShopList', title: 'biz.menu.shop.list' },
       {
-        code: 'shop:notice-audit',
-        path: 'shop-notice-audit',
-        name: 'BizShopNoticeAudit',
-        title: 'biz.menu.shop.noticeAudit'
-      },
-      {
         code: 'merchant:risk',
         path: 'risk',
         name: 'BizMerchantRisk',
@@ -304,28 +298,10 @@ const mockMenus: BizMenu[] = [
         title: 'biz.menu.productContent.productViolation'
       },
       {
-        code: 'product:category',
-        path: 'product/category',
-        name: 'BizProductCategory',
-        title: 'biz.menu.productContent.productCategory'
-      },
-      {
         code: 'content:banner',
         path: 'content/banner',
         name: 'BizContentBanner',
         title: 'biz.menu.productContent.banner'
-      },
-      {
-        code: 'content:quick-entry',
-        path: 'content/quick-entry',
-        name: 'BizContentQuickEntry',
-        title: 'biz.menu.productContent.quickEntry'
-      },
-      {
-        code: 'content:hot-search',
-        path: 'content/hot-search',
-        name: 'BizContentHotSearch',
-        title: 'biz.menu.productContent.hotSearch'
       },
       {
         code: 'content:notice',
@@ -338,12 +314,6 @@ const mockMenus: BizMenu[] = [
         path: 'review/list',
         name: 'BizReviewList',
         title: 'biz.menu.productContent.reviewList'
-      },
-      {
-        code: 'review:appeal',
-        path: 'review/appeal',
-        name: 'BizReviewAppeal',
-        title: 'biz.menu.productContent.reviewAppeal'
       }
     ]
   },
@@ -362,12 +332,6 @@ const mockMenus: BizMenu[] = [
         title: 'biz.menu.ops.promotion'
       },
       { code: 'ops:push', path: 'push', name: 'BizOpsPush', title: 'biz.menu.ops.push' },
-      {
-        code: 'ops:push-template',
-        path: 'push-template',
-        name: 'BizOpsPushTemplate',
-        title: 'biz.menu.ops.pushTemplate'
-      },
       { code: 'ops:region', path: 'region', name: 'BizOpsRegion', title: 'biz.menu.ops.region' }
     ]
   },
@@ -430,24 +394,6 @@ const mockMenus: BizMenu[] = [
     icon: 'ri:settings-3-line',
     children: [
       {
-        code: 'system:admin',
-        path: 'admin',
-        name: 'BizSystemAdmin',
-        title: 'biz.menu.systemBiz.admin'
-      },
-      {
-        code: 'system:role',
-        path: 'role',
-        name: 'BizSystemRole',
-        title: 'biz.menu.systemBiz.role'
-      },
-      {
-        code: 'system:perm',
-        path: 'permission',
-        name: 'BizSystemPermission',
-        title: 'biz.menu.systemBiz.permission'
-      },
-      {
         code: 'system:dict',
         path: 'dict',
         name: 'BizSystemDict',
@@ -458,24 +404,6 @@ const mockMenus: BizMenu[] = [
         path: 'operation-log',
         name: 'BizSystemOperationLog',
         title: 'biz.menu.systemBiz.operationLog'
-      },
-      {
-        code: 'system:api-log',
-        path: 'api-log',
-        name: 'BizSystemApiLog',
-        title: 'biz.menu.systemBiz.apiLog'
-      },
-      {
-        code: 'system:system-config',
-        path: 'system-config',
-        name: 'BizSystemSystemConfig',
-        title: 'biz.menu.systemBiz.systemConfig'
-      },
-      {
-        code: 'system:app-config',
-        path: 'app-config',
-        name: 'BizSystemAppConfig',
-        title: 'biz.menu.systemBiz.appConfig'
       }
     ]
   },
@@ -486,27 +414,7 @@ const mockMenus: BizMenu[] = [
     title: 'biz.menu.csRisk.root',
     icon: 'ri:shield-check-line',
     children: [
-      { code: 'cs:ticket', path: 'ticket', name: 'BizCsTicket', title: 'biz.menu.csRisk.ticket' },
-      {
-        code: 'cs:arbitration',
-        path: 'arbitration',
-        name: 'BizCsArbitration',
-        title: 'biz.menu.csRisk.arbitration'
-      },
-      { code: 'risk:rule', path: 'rule', name: 'BizRiskRule', title: 'biz.menu.csRisk.rule' },
-      {
-        code: 'risk:order',
-        path: 'risk-order',
-        name: 'BizRiskOrder',
-        title: 'biz.menu.csRisk.riskOrder'
-      },
-      { code: 'risk:cheat', path: 'cheat', name: 'BizRiskCheat', title: 'biz.menu.csRisk.cheat' },
-      {
-        code: 'risk:record',
-        path: 'record',
-        name: 'BizRiskRecord',
-        title: 'biz.menu.csRisk.record'
-      }
+      { code: 'cs:ticket', path: 'ticket', name: 'BizCsTicket', title: 'biz.menu.csRisk.ticket' }
     ]
   }
 ]

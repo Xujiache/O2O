@@ -1,8 +1,10 @@
 /**
  * 财务管理 API
  *
- * 路径对齐后端 AdminFinanceController（@Controller('admin')）：
- *   settlement-rules / settlement-records / withdrawals / invoices / reconciliation-report
+ * 路径对齐后端：
+ *   AdminFinanceController     → /admin/settlement-rules /settlement-records /withdrawals /invoices /reconciliation-report
+ *   AdminFinanceExtController  → /admin/finance/overview /finance/bill/list /settlement-records/:id/retry
+ *   ReconciliationListAdminController → /admin/reconciliations
  *
  * @module api/business/finance
  */
@@ -18,8 +20,27 @@ import type {
   BizId
 } from '@/types/business'
 
+export interface BizReconciliationRecord {
+  id: BizId
+  reconNo: string
+  channel: string
+  billDate: string
+  totalOrders: number
+  totalAmount: string
+  totalFee: string
+  channelOrders: number
+  channelAmount: string
+  diffCount: number
+  diffAmount: string
+  status: number
+  billFileUrl?: string | null
+  diffFileUrl?: string | null
+  finishAt?: string | null
+  createdAt: string
+}
+
 export const financeApi = {
-  /** 财务概览（P9 待后端补接口，暂保留路径） */
+  /** 财务概览 */
   overview: () =>
     bizApi.get<{
       income: string
@@ -59,7 +80,7 @@ export const financeApi = {
     bizApi.post<void>(`/withdrawals/${id}/audit`, { action: 'pass', remark }, { needSign: true }),
   withdrawReject: (id: BizId, reason: string) =>
     bizApi.post<void>(`/withdrawals/${id}/audit`, { action: 'reject', reason }, { needSign: true }),
-  /** 批量审核（V8.30；后端暂无 batch 端点，逐个调用 audit 接口） */
+  /** 批量审核（后端暂无 batch 端点，逐个调用 audit 接口） */
   withdrawBatchAudit: async (ids: BizId[], action: 'pass' | 'reject', reason?: string) => {
     let successCount = 0
     let failedCount = 0
@@ -74,7 +95,7 @@ export const financeApi = {
     return { successCount, failedCount }
   },
 
-  /** 账单（P9 待后端补接口，暂保留路径） */
+  /** 账单 */
   billList: (params: BizListParams) =>
     bizApi.get<BizListResp<BizBill>>('/finance/bill/list', params as Record<string, unknown>),
 
@@ -93,13 +114,14 @@ export const financeApi = {
   reconciliationReport: (billDate: string) =>
     bizApi.get<Blob>('/reconciliation-report', { billDate } as Record<string, unknown>),
 
-  /** @deprecated 兼容旧调用，P9 前迁移到 reconciliationReport */
-  reconciliationList: (params: BizListParams) =>
-    bizApi.get<BizListResp<BizSettlementRecord>>(
-      '/settlement-records',
+  /** 对账记录 */
+  reconciliationList: (
+    params: BizListParams & { channel?: string; billDate?: string; status?: number }
+  ) =>
+    bizApi.get<BizListResp<BizReconciliationRecord>>(
+      '/reconciliations',
       params as Record<string, unknown>
     ),
-  /** @deprecated 兼容旧调用，后端暂无此端点，标记 P9 */
   settlementRecordRetry: (id: BizId) =>
     bizApi.post<void>(`/settlement-records/${id}/retry`, {}, { needSign: true })
 }

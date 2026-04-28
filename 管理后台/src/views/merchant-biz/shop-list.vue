@@ -106,7 +106,11 @@
     }
     rangeLoading.value = true
     try {
-      await shopApi.updateDeliveryRange(currentShop.value.id, rangePoints.value)
+      await shopApi.updateDeliveryRange(currentShop.value.id, {
+        cityCode: currentShop.value.cityCode,
+        name: currentShop.value.name,
+        polygon: rangePoints.value
+      })
       ElMessage.success('已保存')
       rangeVisible.value = false
       tableRef.value?.reload()

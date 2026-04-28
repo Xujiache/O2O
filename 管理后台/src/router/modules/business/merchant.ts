@@ -46,12 +46,6 @@ export const bizMerchantRoutes: AppRouteRecord = {
       meta: { title: 'biz.menu.shop.list', icon: 'ri:store-3-line' }
     },
     {
-      path: 'shop-notice-audit',
-      name: 'BizShopNoticeAudit',
-      component: '/merchant-biz/shop-notice-audit',
-      meta: { title: 'biz.menu.shop.noticeAudit', icon: 'ri:notification-line' }
-    },
-    {
       path: 'risk',
       name: 'BizMerchantRisk',
       component: '/merchant-biz/risk',

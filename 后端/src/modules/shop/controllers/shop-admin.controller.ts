@@ -10,7 +10,7 @@
  * 操作日志：audit / ban / unban 必须调 OperationLogService.write({...})
  */
 
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -25,8 +25,10 @@ import { UserTypes } from '@/modules/auth/decorators/user-types.decorator'
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard'
 import { PermissionGuard } from '@/modules/auth/guards/permission.guard'
 import { UserTypeGuard } from '@/modules/auth/guards/user-type.guard'
+import { DeliveryAreaVo, SetDeliveryAreaDto } from '../dto/delivery-area.dto'
 import { OperationLogService } from '@/modules/user/services/operation-log.service'
 import { AdminListShopQueryDto, AuditShopDto, BanShopDto, ShopVo } from '../dto/shop.dto'
+import { DeliveryAreaService } from '../services/delivery-area.service'
 import { ShopService } from '../services/shop.service'
 
 @ApiTags('管理后台 - 店铺')
@@ -38,6 +40,7 @@ import { ShopService } from '../services/shop.service'
 export class ShopAdminController {
   constructor(
     private readonly shopService: ShopService,
+    private readonly deliveryAreaService: DeliveryAreaService,
     private readonly operationLog: OperationLogService
   ) {}
 
@@ -128,5 +131,27 @@ export class ShopAdminController {
       description: '店铺解封'
     })
     return vo
+  }
+
+  @Put(':id/delivery-range')
+  @Permissions('shop:manage')
+  @ApiOperation({ summary: '绠＄悊鍚庡彴 - 璁剧疆搴楅摵閰嶉€佽寖鍥?polygon' })
+  @ApiSwaggerResponse({ status: 200, type: DeliveryAreaVo })
+  async updateDeliveryRange(
+    @Param('id') id: string,
+    @Body() dto: SetDeliveryAreaDto,
+    @CurrentUser('uid') opAdminId: string
+  ): Promise<DeliveryAreaVo> {
+    const shop = await this.shopService.findActiveById(id)
+    const area = await this.deliveryAreaService.setForShop(id, dto, shop.name)
+    await this.operationLog.write({
+      opAdminId,
+      module: 'shop',
+      action: 'delivery-range',
+      resourceType: 'shop',
+      resourceId: id,
+      description: `璁剧疆搴楅摵閰嶉€佽寖鍥?${dto.name ?? shop.name}`
+    })
+    return area
   }
 }

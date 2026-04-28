@@ -119,7 +119,7 @@
   async function onBanConfirm() {
     if (!currentMerchant.value) return
     try {
-      await merchantApi.ban(currentMerchant.value.id, '管理员封禁')
+      await merchantApi.ban(currentMerchant.value.id)
       ElMessage.success(`已封禁 ${currentMerchant.value.name}`)
       banVisible.value = false
       tableRef.value?.reload()

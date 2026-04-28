@@ -61,7 +61,7 @@ instance.interceptors.request.use((config: ExtendedAxiosRequestConfig) => {
   config.headers.set('X-Timestamp', String(ts))
   config.headers.set('X-Nonce', nonce)
   if (userStore.accessToken) {
-    config.headers.set('Authorization', userStore.accessToken)
+    config.headers.set('Authorization', `Bearer ${userStore.accessToken}`)
   }
   if (userStore.info?.userId) {
     config.headers.set('X-Admin-Id', String(userStore.info.userId))
@@ -107,6 +107,35 @@ function handleUnauthorizedDebounced(): void {
   }, 3000)
 }
 
+function normalizeBizPayload<T>(payload: T): T {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return payload
+  }
+  const pagePayload = payload as {
+    list?: unknown
+    meta?: { page?: unknown; pageSize?: unknown; total?: unknown }
+    records?: unknown
+  }
+  if (
+    Array.isArray(pagePayload.list) &&
+    pagePayload.records === undefined &&
+    pagePayload.meta &&
+    typeof pagePayload.meta === 'object'
+  ) {
+    const { page, pageSize, total } = pagePayload.meta
+    if (typeof page === 'number' && typeof pageSize === 'number' && typeof total === 'number') {
+      return {
+        ...(payload as Record<string, unknown>),
+        records: pagePayload.list,
+        total,
+        page,
+        pageSize
+      } as T
+    }
+  }
+  return payload
+}
+
 /**
  * 业务请求统一入口
  *
@@ -138,7 +167,7 @@ export async function bizRequest<T = unknown>(config: BizRequestConfig): Promise
   const res = await instance.request<BaseResponse<T>>(finalConfig)
   const body = res.data
   if (body && body.code === ApiStatus.success) {
-    return body.data as T
+    return normalizeBizPayload(body.data as T)
   }
   if (config.throwBizError === false) {
     return (body?.data as T) ?? (undefined as unknown as T)

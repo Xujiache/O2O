@@ -3,13 +3,6 @@
 -->
 <template>
   <div class="biz-finance-reconciliation">
-    <ElAlert
-      title="对账功能将在系统联调后完整启用，当前展示分账记录概览数据"
-      type="info"
-      show-icon
-      :closable="false"
-      style="margin-bottom: 12px"
-    />
     <BizTable
       ref="tableRef"
       :columns="columns"
@@ -23,9 +16,8 @@
 
 <script setup lang="ts">
   import { ref } from 'vue'
-  import { ElAlert } from 'element-plus'
-  import { financeApi } from '@/api/business'
-  import type { BizSettlementRecord, BizListParams } from '@/types/business'
+  import { financeApi, type BizReconciliationRecord } from '@/api/business/finance'
+  import type { BizListParams } from '@/types/business'
   import { BizTable } from '@/components/biz'
   import type { BizTableColumn } from '@/components/biz/BizTable.vue'
   import { formatAmount, fmtDateTime } from '@/utils/business/format'
@@ -33,37 +25,54 @@
   const tableRef = ref<InstanceType<typeof BizTable> | null>(null)
 
   const searchSchema = [
-    { type: 'input' as const, field: 'keyword', label: '关键词', placeholder: '订单号' },
-    { type: 'dateRange' as const, field: 'range', label: '日期' }
+    {
+      type: 'select' as const,
+      field: 'channel',
+      label: '渠道',
+      options: [
+        { value: 'wxpay', label: '微信支付' },
+        { value: 'alipay', label: '支付宝' }
+      ]
+    },
+    { type: 'date' as const, field: 'billDate', label: '账单日' },
+    {
+      type: 'select' as const,
+      field: 'status',
+      label: '状态',
+      options: [
+        { value: 1, label: '已对平' },
+        { value: 2, label: '有差异' },
+        { value: 3, label: '处理中' },
+        { value: 4, label: '已处理' }
+      ]
+    }
   ]
 
   const columns: BizTableColumn[] = [
     { prop: 'id', label: 'ID', width: 80 },
-    { prop: 'orderNo', label: '订单号', width: 200 },
+    { prop: 'reconNo', label: '对账单号', width: 200 },
+    { prop: 'channel', label: '渠道', width: 100 },
+    { prop: 'billDate', label: '账单日', width: 120 },
+    { prop: 'totalOrders', label: '平台单数', width: 100, align: 'right' },
     {
-      prop: 'total',
-      label: '总额',
+      prop: 'totalAmount',
+      label: '平台金额',
       width: 120,
       align: 'right',
       formatter: (_r, _c, v) => formatAmount(v as string)
     },
+    { prop: 'channelOrders', label: '渠道单数', width: 100, align: 'right' },
     {
-      prop: 'platformAmount',
-      label: '平台',
+      prop: 'channelAmount',
+      label: '渠道金额',
       width: 120,
       align: 'right',
       formatter: (_r, _c, v) => formatAmount(v as string)
     },
+    { prop: 'diffCount', label: '差异笔数', width: 100, align: 'right' },
     {
-      prop: 'merchantAmount',
-      label: '商户',
-      width: 120,
-      align: 'right',
-      formatter: (_r, _c, v) => formatAmount(v as string)
-    },
-    {
-      prop: 'riderAmount',
-      label: '骑手',
+      prop: 'diffAmount',
+      label: '差异金额',
       width: 120,
       align: 'right',
       formatter: (_r, _c, v) => formatAmount(v as string)
@@ -72,24 +81,24 @@
       prop: 'status',
       label: '状态',
       width: 100,
-      formatter: (_r, _c, v) => (v === 2 ? '正常' : v === 3 ? '差异' : '处理中')
+      formatter: (_r, _c, v) =>
+        v === 1 ? '已对平' : v === 2 ? '有差异' : v === 3 ? '处理中' : '已处理'
     },
-    { prop: 'errorMsg', label: '差异说明', minWidth: 160 },
     {
       prop: 'createdAt',
-      label: '时间',
+      label: '创建时间',
       width: 170,
       formatter: (_r, _c, v) => fmtDateTime(v as string)
     }
   ]
 
   async function fetchList(params: Record<string, unknown>) {
-    const next: BizListParams = {
+    const next: BizListParams & { channel?: string; billDate?: string; status?: number } = {
       page: Number(params.page) || 1,
       pageSize: Number(params.pageSize) || 20,
-      keyword: params.keyword as string,
-      startTime: Array.isArray(params.range) ? (params.range[0] as string) : undefined,
-      endTime: Array.isArray(params.range) ? (params.range[1] as string) : undefined
+      channel: params.channel as string,
+      billDate: params.billDate as string,
+      status: params.status as number | undefined
     }
     const resp = await financeApi.reconciliationList(next)
     return {
@@ -102,15 +111,19 @@
 
   async function syncFetch(): Promise<Record<string, unknown>[]> {
     const all = await financeApi.reconciliationList({ page: 1, pageSize: 9999 })
-    return all.records.map((r: BizSettlementRecord) => ({
+    return all.records.map((r: BizReconciliationRecord) => ({
       id: r.id,
-      订单号: r.orderNo,
-      总额: r.total,
-      平台: r.platformAmount,
-      商户: r.merchantAmount,
-      骑手: r.riderAmount,
-      状态: r.status === 2 ? '正常' : '差异',
-      差异说明: r.errorMsg
+      对账单号: r.reconNo,
+      渠道: r.channel,
+      账单日: r.billDate,
+      平台单数: r.totalOrders,
+      平台金额: r.totalAmount,
+      渠道单数: r.channelOrders,
+      渠道金额: r.channelAmount,
+      差异笔数: r.diffCount,
+      差异金额: r.diffAmount,
+      状态:
+        r.status === 1 ? '已对平' : r.status === 2 ? '有差异' : r.status === 3 ? '处理中' : '已处理'
     }))
   }
   const exportConfig = { name: '对账', module: 'reconciliation', syncFetch }

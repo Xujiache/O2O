@@ -26,6 +26,9 @@ import {
 /** Redis 缓存 Key（K06）TTL 30min */
 const USER_INFO_KEY = (userId: string): string => `user:info:${userId}`
 const USER_INFO_TTL_SECONDS = 1800
+const CN_ID_CARD_REGEX = /^[0-9]{17}[0-9Xx]$/
+const CN_ID_CARD_WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+const CN_ID_CARD_CHECK_CODES = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
 
 @Injectable()
 export class UserService {
@@ -81,7 +84,11 @@ export class UserService {
     if (u.isRealname === 1) {
       throw new BusinessException(BizErrorCode.BIZ_DATA_CONFLICT, '已实名，无需重复提交')
     }
-    const idCardHash = CryptoUtil.hmac(dto.idCard)
+
+    this.validateRealnameInput(dto)
+    const normalizedRealName = dto.realName.trim()
+    const normalizedIdCard = dto.idCard.trim().toUpperCase()
+    const idCardHash = CryptoUtil.hmac(normalizedIdCard)
     const dup = await this.userRepo
       .createQueryBuilder('u')
       .where('u.id_card_hash = :h', { h: idCardHash })
@@ -92,16 +99,32 @@ export class UserService {
       throw new BusinessException(BizErrorCode.BIZ_DATA_CONFLICT, '该身份证号已被他人实名')
     }
 
-    // TODO: 三方核身适配器（实际接入阿里云身份二要素 / 腾讯云实名核身）
-    //       本期占位默认通过
-    u.realNameEnc = CryptoUtil.encrypt(dto.realName, u.encKeyVer)
-    u.idCardEnc = CryptoUtil.encrypt(dto.idCard, u.encKeyVer)
+    u.realNameEnc = CryptoUtil.encrypt(normalizedRealName, u.encKeyVer)
+    u.idCardEnc = CryptoUtil.encrypt(normalizedIdCard, u.encKeyVer)
     u.idCardHash = idCardHash
+    u.idCardTail4 = CryptoUtil.tail4(normalizedIdCard)
+    u.birthday = extractBirthdayFromChineseIdCard(normalizedIdCard)
     u.isRealname = 1
     await this.userRepo.save(u)
     await this.invalidateCache(userId)
     this.logger.log(`用户 ${userId} 实名认证成功`)
     return this.toDetailVo(u)
+  }
+
+  /**
+   * 校验实名认证入参（姓名 / 身份证格式 / 生日片段）
+   * 参数：dto SubmitRealnameDto
+   * 返回值：void
+   * 用途：在写入加密字段前做本地严格校验，替代“默认通过”占位逻辑
+   */
+  private validateRealnameInput(dto: SubmitRealnameDto): void {
+    const realName = dto.realName.trim()
+    if (!/^[一-龥·]{2,32}$/u.test(realName)) {
+      throw new BusinessException(BizErrorCode.PARAM_INVALID, '真实姓名格式不合法')
+    }
+    if (!CN_ID_CARD_REGEX.test(dto.idCard) || !isValidChineseIdCard(dto.idCard)) {
+      throw new BusinessException(BizErrorCode.PARAM_INVALID, '身份证号格式不合法')
+    }
   }
 
   /**
@@ -217,6 +240,37 @@ export class UserService {
   static get CACHE_TTL_SECONDS(): number {
     return USER_INFO_TTL_SECONDS
   }
+}
+
+function isValidChineseIdCard(idCard: string): boolean {
+  if (!CN_ID_CARD_REGEX.test(idCard)) return false
+  const birth = extractBirthdayFromChineseIdCard(idCard)
+  if (!birth) return false
+  let sum = 0
+  for (let i = 0; i < 17; i++) {
+    sum += Number(idCard[i]) * CN_ID_CARD_WEIGHTS[i]
+  }
+  const code = CN_ID_CARD_CHECK_CODES[sum % 11]
+  return code === idCard[17].toUpperCase()
+}
+
+function extractBirthdayFromChineseIdCard(idCard: string): Date | null {
+  const year = Number(idCard.slice(6, 10))
+  const month = Number(idCard.slice(10, 12))
+  const day = Number(idCard.slice(12, 14))
+  const dt = new Date(year, month - 1, day)
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    dt.getFullYear() !== year ||
+    dt.getMonth() !== month - 1 ||
+    dt.getDate() !== day ||
+    dt > new Date()
+  ) {
+    return null
+  }
+  return dt
 }
 
 /**
