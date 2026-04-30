@@ -34,6 +34,7 @@
       <template #footer>
         <ElButton @click="rejectVisible = false">取消</ElButton>
         <ElButton
+          v-biz-auth="'biz:finance:withdraw:audit'"
           type="danger"
           :disabled="!rejectForm.reason"
           :loading="loading"

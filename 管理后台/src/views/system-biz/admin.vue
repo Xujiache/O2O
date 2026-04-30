@@ -12,7 +12,9 @@
       row-key="id"
     >
       <template #actions>
-        <ElButton type="primary" @click="onCreate">新增管理员</ElButton>
+        <ElButton v-biz-auth="'biz:system:admin:create'" type="primary" @click="onCreate"
+          >新增管理员</ElButton
+        >
       </template>
     </BizTable>
 

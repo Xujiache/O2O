@@ -32,7 +32,12 @@
       </ElForm>
       <template #footer>
         <ElButton @click="judgeVisible = false">取消</ElButton>
-        <ElButton type="primary" :disabled="!judgeForm.result" :loading="loading" @click="onJudge"
+        <ElButton
+          v-biz-auth="'biz:cs:arbitration:judge'"
+          type="primary"
+          :disabled="!judgeForm.result"
+          :loading="loading"
+          @click="onJudge"
           >确认</ElButton
         >
       </template>

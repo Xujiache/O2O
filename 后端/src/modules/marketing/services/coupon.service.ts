@@ -19,6 +19,7 @@
 
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import BigNumber from 'bignumber.js'
 import type Redis from 'ioredis'
 import { Repository, type FindOptionsWhere } from 'typeorm'
 import { BizErrorCode, BusinessException, type PageResult, makePageResult } from '@/common'
@@ -617,8 +618,8 @@ export class CouponService {
   private assertCreatePayloadConsistent(dto: CreateCouponDto): void {
     /* 折扣券：discountValue 应在 (0, 1) 区间 */
     if (dto.couponType === 2) {
-      const dv = parseFloat(dto.discountValue)
-      if (!Number.isFinite(dv) || dv <= 0 || dv >= 1) {
+      const dv = new BigNumber(dto.discountValue)
+      if (!dv.isFinite() || dv.lte(0) || dv.gte(1)) {
         throw new BusinessException(
           BizErrorCode.PARAM_INVALID,
           '折扣券 discountValue 必须在 (0, 1) 之间，例如 0.85 表示 85 折'
@@ -627,8 +628,8 @@ export class CouponService {
     }
     /* 满减/立减：discountValue > 0 */
     if (dto.couponType === 1 || dto.couponType === 3) {
-      const dv = parseFloat(dto.discountValue)
-      if (!Number.isFinite(dv) || dv <= 0) {
+      const dv = new BigNumber(dto.discountValue)
+      if (!dv.isFinite() || dv.lte(0)) {
         throw new BusinessException(
           BizErrorCode.PARAM_INVALID,
           '满减/立减券 discountValue 必须 > 0'
@@ -637,8 +638,8 @@ export class CouponService {
     }
     /* 满减券必须设置 minOrderAmount */
     if (dto.couponType === 1) {
-      const moa = parseFloat(dto.minOrderAmount ?? '0')
-      if (!Number.isFinite(moa) || moa <= 0) {
+      const moa = new BigNumber(dto.minOrderAmount ?? '0')
+      if (!moa.isFinite() || moa.lte(0)) {
         throw new BusinessException(BizErrorCode.PARAM_INVALID, '满减券必须设置 minOrderAmount > 0')
       }
     }

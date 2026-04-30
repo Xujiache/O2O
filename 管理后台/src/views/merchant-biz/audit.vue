@@ -28,7 +28,13 @@
       </ElForm>
       <template #footer>
         <ElButton @click="rejectVisible = false">取消</ElButton>
-        <ElButton type="danger" :loading="loading" :disabled="!rejectForm.reason" @click="onReject">
+        <ElButton
+          v-biz-auth="'biz:merchant:audit'"
+          type="danger"
+          :loading="loading"
+          :disabled="!rejectForm.reason"
+          @click="onReject"
+        >
           确认驳回
         </ElButton>
       </template>

@@ -68,6 +68,57 @@ export default ({ mode }: { mode: string }) => {
         warnOnError: true,
         exclude: [],
         include: ['src/views/**/*.vue']
+      },
+      // 拆分 vendor chunk，避免主 chunk 超过 chunkSizeWarningLimit（2000KB）
+      // 决议：P9-P0-02 / L8-04 / P8-R1R2-I02
+      // 大体积依赖按业务域单独成 chunk，让浏览器并行下载、首屏只加载主链路。
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return undefined
+            // 富文本编辑器（最大单点）
+            if (id.includes('@wangeditor')) return 'vendor-wangeditor'
+            // 图表
+            if (id.includes('echarts') || id.includes('zrender')) return 'vendor-echarts'
+            // Excel 导出
+            if (id.includes('xlsx')) return 'vendor-xlsx'
+            // 视频播放
+            if (id.includes('xgplayer')) return 'vendor-xgplayer'
+            // 代码高亮
+            if (id.includes('highlight.js')) return 'vendor-highlight'
+            // Element Plus 全家桶（含 icons / dayjs / @ctrl/tinycolor）
+            if (
+              id.includes('element-plus') ||
+              id.includes('@element-plus/icons-vue') ||
+              id.includes('@ctrl/tinycolor')
+            ) {
+              return 'vendor-element-plus'
+            }
+            // Iconify
+            if (id.includes('@iconify')) return 'vendor-iconify'
+            // 加密 / 文件保存 / QR
+            if (
+              id.includes('crypto-js') ||
+              id.includes('file-saver') ||
+              id.includes('qrcode.vue')
+            ) {
+              return 'vendor-utils'
+            }
+            // Vue 全家桶
+            if (
+              id.includes('node_modules/vue/') ||
+              id.includes('vue-router') ||
+              id.includes('pinia') ||
+              id.includes('@vueuse/core') ||
+              id.includes('vue-i18n') ||
+              id.includes('vue-draggable-plus')
+            ) {
+              return 'vendor-vue'
+            }
+            // 其余 node_modules 合并到 vendor
+            return 'vendor'
+          }
+        }
       }
     },
     plugins: [

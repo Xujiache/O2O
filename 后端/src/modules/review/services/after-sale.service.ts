@@ -37,6 +37,7 @@
  */
 
 import { HttpStatus, Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common'
+import BigNumber from 'bignumber.js'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, Repository, type FindOptionsWhere } from 'typeorm'
 import { BizErrorCode, BusinessException, type PageResult, makePageResult } from '@/common'
@@ -106,12 +107,12 @@ export class AfterSaleService {
         '订单未完成（status≠55），暂不支持申请售后'
       )
     }
-    const apply = parseFloat(dto.applyAmount)
-    const pay = parseFloat(order.payAmount)
-    if (!Number.isFinite(apply) || apply <= 0) {
+    const apply = new BigNumber(dto.applyAmount)
+    const pay = new BigNumber(order.payAmount)
+    if (!apply.isFinite() || apply.lte(0)) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, 'applyAmount 必须 > 0')
     }
-    if (apply > pay) {
+    if (apply.gt(pay)) {
       throw new BusinessException(
         BizErrorCode.PARAM_INVALID,
         `applyAmount(¥${dto.applyAmount}) 不能超过订单实付金额(¥${order.payAmount})`
@@ -211,12 +212,12 @@ export class AfterSaleService {
     if (!dto.actualAmount) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, 'agree 时必须传 actualAmount')
     }
-    const actual = parseFloat(dto.actualAmount)
-    const apply = parseFloat(as.applyAmount)
-    if (!Number.isFinite(actual) || actual <= 0) {
+    const actual = new BigNumber(dto.actualAmount)
+    const apply = new BigNumber(as.applyAmount)
+    if (!actual.isFinite() || actual.lte(0)) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, 'actualAmount 必须 > 0')
     }
-    if (actual > apply) {
+    if (actual.gt(apply)) {
       throw new BusinessException(
         BizErrorCode.PARAM_INVALID,
         `actualAmount(¥${dto.actualAmount}) 不能超过 applyAmount(¥${as.applyAmount})`
@@ -382,12 +383,12 @@ export class AfterSaleService {
     if (!dto.actualAmount) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, 'agree 时必须传 actualAmount')
     }
-    const actual = parseFloat(dto.actualAmount)
-    const apply = parseFloat(as.applyAmount)
-    if (!Number.isFinite(actual) || actual <= 0) {
+    const actual = new BigNumber(dto.actualAmount)
+    const apply = new BigNumber(as.applyAmount)
+    if (!actual.isFinite() || actual.lte(0)) {
       throw new BusinessException(BizErrorCode.PARAM_INVALID, 'actualAmount 必须 > 0')
     }
-    if (actual > apply) {
+    if (actual.gt(apply)) {
       throw new BusinessException(
         BizErrorCode.PARAM_INVALID,
         `actualAmount(¥${dto.actualAmount}) 不能超过 applyAmount(¥${as.applyAmount})`

@@ -257,4 +257,198 @@ describe('AccountService', () => {
       expect(result.account.totalIncome).toBe('520.00')
     })
   })
+
+  /**
+   * P9/Sprint1 W1.C.3 增补：findById / findByOwner / getOrCreatePlatformAccount
+   */
+  describe('lookups', () => {
+    it('findById returns account when found', async () => {
+      const acc = buildAccount({ id: 'A77' })
+      accountRepoFindOne.mockResolvedValueOnce(acc)
+      const got = await service.findById('A77')
+      expect(got.id).toBe('A77')
+    })
+
+    it('findById throws BIZ_RESOURCE_NOT_FOUND when not found', async () => {
+      accountRepoFindOne.mockResolvedValueOnce(null)
+      await expect(service.findById('NOPE')).rejects.toMatchObject({
+        bizCode: BizErrorCode.BIZ_RESOURCE_NOT_FOUND
+      })
+    })
+
+    it('findByOwner returns null when not found', async () => {
+      accountRepoFindOne.mockResolvedValueOnce(null)
+      const got = await service.findByOwner(AccountOwnerTypeEnum.MERCHANT, 'M_NOT_EXIST')
+      expect(got).toBeNull()
+    })
+
+    it('findByOwner returns account when found', async () => {
+      const acc = buildAccount({ ownerId: 'M2' })
+      accountRepoFindOne.mockResolvedValueOnce(acc)
+      const got = await service.findByOwner(AccountOwnerTypeEnum.MERCHANT, 'M2')
+      expect(got?.ownerId).toBe('M2')
+    })
+
+    it('getOrCreatePlatformAccount delegates to getOrCreateAccount with PLATFORM_OWNER_ID', async () => {
+      const acc = buildAccount({ ownerType: AccountOwnerTypeEnum.RIDER, ownerId: '0' })
+      accountRepoFindOne.mockResolvedValueOnce(acc)
+      const got = await service.getOrCreatePlatformAccount()
+      expect(got.ownerType).toBe(AccountOwnerTypeEnum.RIDER)
+      expect(got.ownerId).toBe('0')
+    })
+  })
+
+  /**
+   * P9/Sprint1 W1.C.3 增补：listFlows / listFlowsByOwner / findFlowsByRelatedNo
+   */
+  describe('flows queries', () => {
+    let qbAndWhere: jest.Mock
+    let qbGetManyAndCount: jest.Mock
+    const buildQbStub = (rows: unknown[], total: number) => {
+      qbAndWhere = jest.fn().mockReturnThis()
+      qbGetManyAndCount = jest.fn().mockResolvedValue([rows, total])
+      return {
+        where: jest.fn().mockReturnThis(),
+        andWhere: qbAndWhere,
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: qbGetManyAndCount
+      }
+    }
+
+    it('listFlows applies bizType + direction filters', async () => {
+      const flowRow = {
+        id: 'F1',
+        flowNo: 'F0001',
+        accountId: 'A1',
+        ownerType: AccountOwnerTypeEnum.MERCHANT,
+        ownerId: 'M1',
+        direction: FlowDirectionEnum.IN,
+        bizType: FlowBizTypeEnum.SETTLEMENT,
+        amount: '10.00',
+        balanceAfter: '110.00',
+        relatedNo: 'S0001',
+        remark: 'test',
+        opAdminId: null,
+        createdAt: new Date('2026-03-01')
+      }
+      const qb = buildQbStub([flowRow], 1)
+      ;(
+        service as unknown as { flowRepo: { createQueryBuilder: jest.Mock } }
+      ).flowRepo.createQueryBuilder = jest.fn().mockReturnValue(qb)
+
+      const result = await service.listFlows('A1', {
+        bizType: FlowBizTypeEnum.SETTLEMENT,
+        direction: FlowDirectionEnum.IN,
+        page: 1,
+        pageSize: 10,
+        skip: () => 0,
+        take: () => 10
+      } as unknown as Parameters<typeof service.listFlows>[1])
+
+      expect(result.meta.total).toBe(1)
+      expect(result.list[0]?.flowNo).toBe('F0001')
+      expect(qbAndWhere).toHaveBeenCalledTimes(2)
+    })
+
+    it('listFlowsByOwner returns empty page when account missing', async () => {
+      accountRepoFindOne.mockResolvedValueOnce(null)
+      const result = await service.listFlowsByOwner(AccountOwnerTypeEnum.MERCHANT, 'NO_ACC', {
+        page: 1,
+        pageSize: 10,
+        skip: () => 0,
+        take: () => 10
+      } as unknown as Parameters<typeof service.listFlowsByOwner>[2])
+      expect(result.meta.total).toBe(0)
+      expect(result.list).toHaveLength(0)
+    })
+
+    it('listFlowsByOwner delegates to listFlows when account exists', async () => {
+      const acc = buildAccount({ id: 'A88' })
+      accountRepoFindOne.mockResolvedValueOnce(acc)
+      const qb = buildQbStub([], 0)
+      ;(
+        service as unknown as { flowRepo: { createQueryBuilder: jest.Mock } }
+      ).flowRepo.createQueryBuilder = jest.fn().mockReturnValue(qb)
+
+      const result = await service.listFlowsByOwner(AccountOwnerTypeEnum.MERCHANT, 'M88', {
+        page: 1,
+        pageSize: 10,
+        skip: () => 0,
+        take: () => 10
+      } as unknown as Parameters<typeof service.listFlowsByOwner>[2])
+      expect(result.meta.total).toBe(0)
+    })
+
+    it('findFlowsByRelatedNo calls flowRepo.find with correct where', async () => {
+      const findMock = jest.fn().mockResolvedValue([{ id: 'F1' }])
+      ;(service as unknown as { flowRepo: { find: jest.Mock } }).flowRepo.find = findMock
+      const got = await service.findFlowsByRelatedNo('S0001')
+      expect(got).toHaveLength(1)
+      expect(findMock).toHaveBeenCalledWith({
+        where: { relatedNo: 'S0001', isDeleted: 0 },
+        order: { createdAt: 'DESC' }
+      })
+    })
+  })
+
+  /**
+   * P9/Sprint1 W1.C.3 增补：toVo / flowToVo 纯映射
+   */
+  describe('VO mappers', () => {
+    it('toVo maps Account fields', () => {
+      const acc = buildAccount({ id: 'A123', balance: '88.88' })
+      const vo = service.toVo(acc)
+      expect(vo.id).toBe('A123')
+      expect(vo.balance).toBe('88.88')
+      expect(vo.ownerType).toBe(AccountOwnerTypeEnum.MERCHANT)
+    })
+
+    it('flowToVo maps AccountFlow fields', () => {
+      const flow = {
+        id: 'F2',
+        flowNo: 'F0002',
+        accountId: 'A1',
+        ownerType: AccountOwnerTypeEnum.RIDER,
+        ownerId: 'R1',
+        direction: FlowDirectionEnum.OUT,
+        bizType: FlowBizTypeEnum.WITHDRAW,
+        amount: '20.00',
+        balanceAfter: '80.00',
+        relatedNo: 'W0001',
+        remark: 'withdraw',
+        opAdminId: null,
+        createdAt: new Date('2026-03-02')
+      }
+      const vo = service.flowToVo(flow as never)
+      expect(vo.flowNo).toBe('F0002')
+      expect(vo.direction).toBe(FlowDirectionEnum.OUT)
+      expect(vo.bizType).toBe(FlowBizTypeEnum.WITHDRAW)
+    })
+  })
+
+  /**
+   * P9/Sprint1 W1.C.3 增补：getOrCreateAccount 并发竞态（line 119-125）
+   * race condition: save() 抛错（如唯一键冲突）→ findOne 重新拉取已存在记录
+   */
+  describe('getOrCreateAccount race', () => {
+    it('save throws then refound returns existing', async () => {
+      accountRepoFindOne
+        .mockResolvedValueOnce(null) /* 第一次 findOne：不存在 */
+        .mockResolvedValueOnce(buildAccount({ id: 'A_RACE' })) /* save 抛错后再查：拿到他人插入的 */
+      accountRepoSave.mockRejectedValueOnce(new Error('Duplicate key'))
+      const got = await service.getOrCreateAccount(AccountOwnerTypeEnum.MERCHANT, 'M_RACE')
+      expect(got.id).toBe('A_RACE')
+    })
+
+    it('save throws and refound returns null -> rethrows original error', async () => {
+      accountRepoFindOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      accountRepoSave.mockRejectedValueOnce(new Error('真实 DB 写入故障'))
+      await expect(
+        service.getOrCreateAccount(AccountOwnerTypeEnum.MERCHANT, 'M_FATAL')
+      ).rejects.toThrow('真实 DB 写入故障')
+    })
+  })
 })

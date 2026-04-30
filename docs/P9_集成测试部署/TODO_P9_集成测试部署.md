@@ -1,7 +1,19 @@
 # TODO_P9_集成测试部署
 
 ## 一、进行中
-- [ ] —
+
+### Sprint 1（启动盘点 + P8 遗留收口 + 测试线启动，2026-05-01 进行中）
+
+- [x] W1.A.1 git status / diff（基准 commit `1171241`）
+- [x] W1.A.2 52 项 WBS 实际状态扫描
+- [x] W1.A.3 输出 `P9_PROGRESS_BASELINE_2026-05-01.md`
+- [x] W1.A.4 输出 `P9_REMAINING_PUNCHLIST.md`
+- [x] W1.B.1 管理后台主 chunk 拆分（2796 KB → 主 173 KB；最大 vendor 941 KB ≤ 2000 KB；无警告）
+- [x] W1.B.2 BizAuth 5 处真用 + 输出 `P9_PERM_AUDIT_REPORT.md`（5 角色矩阵）
+- [x] W1.C.1 后端 test:cov 基线（lines 72.06 → 87.09 / branches 55.63 → 70.64 / functions 64.7 → 86.09）
+- [x] W1.C.2-3 补 settlement / account 单测（+20 测试，settlement 51.78 → 67.26 lines；account 69.82 → 91.37 lines）
+- [x] W1.C.4 11 处 `parseFloat(amount)` → `BigNumber`（coupon 3 / after-sale 6 / arbitration 2）
+- [x] W1.C.5 后端覆盖率三项 ≥ 70% 全部达标
 
 ## 二、待办（需外部条件）
 
@@ -60,7 +72,7 @@
 - [x] test.sh 统一测试脚本
 
 ### M9.1 测试（部分 6/12）
-- [x] T9.1 后端单测（24 套件 / 208 测试全通过）
+- [x] T9.1 后端单测（**Sprint 1 W1.C 重测**：24 套件 / **228 测试**全通过；coverage `lines 87.09% / branches 70.64% / functions 86.09%`，三项均 ≥70%）
 - [x] T9.3 Playwright 管理后台 E2E（10 模块：登录/订单/店铺/财务/营销/评价/配送/商品/用户/系统）
 - [x] T9.6 k6 压测脚本（下单 1000TPS / 支付 500TPS / 骑手上报 2000TPS）
 - [x] T9.8 OWASP ZAP 安全扫描配置
@@ -102,3 +114,4 @@
 | 2026-04-18 | 初建，依据 TASK_P9 拆解 | 架构组 |
 | 2026-04-21 | 完成 M9.2/M9.3/M9.6 全量 + M9.1/M9.4/M9.5 部分 | AI |
 | 2026-04-21 | 补充 Playwright E2E/Grafana 面板/Loki/Promtail/Kustomize/CI脚本 | AI |
+| 2026-05-01 | Sprint 1 启动：盘点 + 主 chunk 拆分 + BizAuth 真用 + 11 处 parseFloat 修复 + 单测覆盖率三项 ≥70% | 单 Agent V2.0 |

@@ -322,5 +322,219 @@ describe('SettlementService', () => {
       expect(saved.status).toBe(SettlementRecordStatusEnum.FAILED)
       expect(saved.errorMsg).toContain('account locked')
     })
+
+    /**
+     * P9/Sprint1 W1.C.2 增补：MERCHANT/RIDER targetId 缺失 → status=FAILED + errorMsg
+     * 走 resolveOwnerForTarget 返回 null 分支（lines 274-280）
+     */
+    it('MERCHANT target with null targetId -> FAILED with targetId 缺失', async () => {
+      const record = {
+        id: 'SR2',
+        settlementNo: 'S0002',
+        orderNo: 'T20260419000005678',
+        targetType: SettlementTargetTypeEnum.MERCHANT,
+        targetId: null,
+        settleAmount: '10.00',
+        status: SettlementRecordStatusEnum.PENDING,
+        errorMsg: null,
+        settleAt: null,
+        flowNo: null,
+        updatedAt: new Date()
+      } as unknown as SettlementRecord
+
+      const saved = await service.execute(record)
+      expect(saved.status).toBe(SettlementRecordStatusEnum.FAILED)
+      expect(saved.errorMsg).toContain('targetId')
+      /* 不应调用 accountService.earn */
+      expect(accountServiceEarn).not.toHaveBeenCalled()
+    })
+
+    it('RIDER target with null targetId -> FAILED with targetId 缺失', async () => {
+      const record = {
+        id: 'SR3',
+        settlementNo: 'S0003',
+        orderNo: 'T20260419000006789',
+        targetType: SettlementTargetTypeEnum.RIDER,
+        targetId: null,
+        settleAmount: '5.00',
+        status: SettlementRecordStatusEnum.PENDING,
+        errorMsg: null,
+        settleAt: null,
+        flowNo: null,
+        updatedAt: new Date()
+      } as unknown as SettlementRecord
+
+      const saved = await service.execute(record)
+      expect(saved.status).toBe(SettlementRecordStatusEnum.FAILED)
+      expect(saved.errorMsg).toContain('targetId')
+    })
+
+    it('PLATFORM target works without targetId (uses PLATFORM_OWNER_ID)', async () => {
+      const record = {
+        id: 'SR4',
+        settlementNo: 'S0004',
+        orderNo: 'T20260419000007890',
+        targetType: SettlementTargetTypeEnum.PLATFORM,
+        targetId: null,
+        settleAmount: '2.00',
+        status: SettlementRecordStatusEnum.PENDING,
+        errorMsg: null,
+        settleAt: null,
+        flowNo: null,
+        updatedAt: new Date()
+      } as unknown as SettlementRecord
+
+      const saved = await service.execute(record)
+      expect(saved.status).toBe(SettlementRecordStatusEnum.EXECUTED)
+      expect(accountServiceEarn).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  /**
+   * P9/Sprint1 W1.C.2 增补：runForOrder 完整闭环（lines 325-341）
+   */
+  describe('runForOrder', () => {
+    it('compute + execute 全部成功 -> created/executed 一致', async () => {
+      matchRulesForOrder.mockResolvedValue({
+        merchant: buildRule({ id: 'RM', rate: '0.10' }),
+        rider: buildRule({ id: 'RR', rate: '0.05' }),
+        platform: buildRule({ id: 'RP', rate: '0.02' })
+      })
+
+      const input: SettlementInput = {
+        orderNo: 'T20260419000004321',
+        orderType: OrderTypeEnum.TAKEOUT,
+        merchantId: 'M1',
+        riderId: 'R1',
+        shopId: 'S1',
+        cityCode: '110000',
+        payAmount: '100.00',
+        finishedAt: new Date()
+      }
+
+      const result = await service.runForOrder(input)
+      expect(result.created).toBe(3)
+      expect(result.executed).toBe(3)
+      expect(result.failed).toBe(0)
+      expect(result.skipped).toBe(0)
+    })
+
+    it('execute 部分失败时计入 failed', async () => {
+      matchRulesForOrder.mockResolvedValue({
+        merchant: buildRule({ id: 'RM' }),
+        rider: null,
+        platform: null
+      })
+      /* 第一条 execute 抛错 */
+      accountServiceEarn.mockRejectedValueOnce(new Error('balance frozen'))
+
+      const input: SettlementInput = {
+        orderNo: 'T20260419000005432',
+        orderType: OrderTypeEnum.TAKEOUT,
+        merchantId: 'M1',
+        riderId: null,
+        shopId: 'S1',
+        cityCode: '110000',
+        payAmount: '100.00',
+        finishedAt: new Date()
+      }
+
+      const result = await service.runForOrder(input)
+      expect(result.created).toBe(1)
+      expect(result.executed).toBe(0)
+      expect(result.failed).toBe(1)
+    })
+  })
+
+  /**
+   * P9/Sprint1 W1.C.2 增补：list / toVo（lines 513-555）
+   */
+  describe('list / toVo', () => {
+    it('list with all filters builds full QueryBuilder chain', async () => {
+      const qbWhere = jest.fn().mockReturnThis()
+      const qbAndWhere = jest.fn().mockReturnThis()
+      const qbOrderBy = jest.fn().mockReturnThis()
+      const qbAddOrderBy = jest.fn().mockReturnThis()
+      const qbSkip = jest.fn().mockReturnThis()
+      const qbTake = jest.fn().mockReturnThis()
+      const qbGetManyAndCount = jest.fn().mockResolvedValue([
+        [
+          {
+            id: 'X1',
+            settlementNo: 'S001',
+            orderNo: 'T1',
+            orderType: 1,
+            targetType: SettlementTargetTypeEnum.MERCHANT,
+            targetId: 'M1',
+            ruleId: 'R1',
+            baseAmount: '100.00',
+            rate: '0.10',
+            fixedFee: '0.00',
+            settleAmount: '10.00',
+            status: SettlementRecordStatusEnum.EXECUTED,
+            settleAt: new Date('2026-01-01'),
+            flowNo: 'F001',
+            errorMsg: null,
+            createdAt: new Date('2026-01-01')
+          }
+        ],
+        1
+      ])
+      const fakeQb = {
+        where: qbWhere,
+        andWhere: qbAndWhere,
+        orderBy: qbOrderBy,
+        addOrderBy: qbAddOrderBy,
+        skip: qbSkip,
+        take: qbTake,
+        getManyAndCount: qbGetManyAndCount
+      }
+      ;(
+        service as unknown as { recordRepo: { createQueryBuilder: jest.Mock } }
+      ).recordRepo.createQueryBuilder = jest.fn().mockReturnValue(fakeQb)
+
+      const result = await service.list({
+        orderNo: 'T1',
+        orderType: 1,
+        targetType: SettlementTargetTypeEnum.MERCHANT,
+        targetId: 'M1',
+        status: SettlementRecordStatusEnum.EXECUTED,
+        page: 1,
+        pageSize: 20,
+        skip: () => 0,
+        take: () => 20
+      } as unknown as Parameters<typeof service.list>[0])
+
+      expect(result.meta.total).toBe(1)
+      expect(result.list).toHaveLength(1)
+      expect(qbAndWhere).toHaveBeenCalledTimes(5)
+    })
+
+    it('toVo maps entity to plain VO', () => {
+      const entity = {
+        id: 'V1',
+        settlementNo: 'S100',
+        orderNo: 'T100',
+        orderType: 1,
+        targetType: SettlementTargetTypeEnum.PLATFORM,
+        targetId: null,
+        ruleId: 'RP',
+        baseAmount: '50.00',
+        rate: '0.02',
+        fixedFee: '0.00',
+        settleAmount: '1.00',
+        status: SettlementRecordStatusEnum.EXECUTED,
+        settleAt: new Date('2026-02-01'),
+        flowNo: 'F100',
+        errorMsg: null,
+        createdAt: new Date('2026-02-01')
+      } as unknown as SettlementRecord
+
+      const vo = service.toVo(entity)
+      expect(vo.id).toBe('V1')
+      expect(vo.settlementNo).toBe('S100')
+      expect(vo.targetType).toBe(SettlementTargetTypeEnum.PLATFORM)
+      expect(vo.flowNo).toBe('F100')
+    })
   })
 })

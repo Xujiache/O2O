@@ -25,6 +25,7 @@
 
 import { HttpStatus, Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import BigNumber from 'bignumber.js'
 import { DataSource, Repository, type FindOptionsWhere } from 'typeorm'
 import { BizErrorCode, BusinessException, type PageResult, makePageResult } from '@/common'
 import { Arbitration } from '@/entities'
@@ -255,11 +256,14 @@ export class ArbitrationService {
     }
 
     const willRefund = this.shouldTriggerRefund(arb, dto)
-    if (willRefund && (!dto.decisionAmount || parseFloat(dto.decisionAmount) <= 0)) {
-      throw new BusinessException(
-        BizErrorCode.PARAM_INVALID,
-        '申请方胜 / 部分支持 + 申请方为用户：必须传 decisionAmount > 0'
-      )
+    if (willRefund) {
+      const da = dto.decisionAmount ? new BigNumber(dto.decisionAmount) : null
+      if (!da || !da.isFinite() || da.lte(0)) {
+        throw new BusinessException(
+          BizErrorCode.PARAM_INVALID,
+          '申请方胜 / 部分支持 + 申请方为用户：必须传 decisionAmount > 0'
+        )
+      }
     }
 
     /* 事务：更新 arbitration + 同步 source */
@@ -434,7 +438,8 @@ export class ArbitrationService {
     }
     if (arb.applicantType !== ArbitrationPartyTypeEnum.USER) return false
     if (!dto.decisionAmount) return false
-    return parseFloat(dto.decisionAmount) > 0
+    const da = new BigNumber(dto.decisionAmount)
+    return da.isFinite() && da.gt(0)
   }
 
   /**
