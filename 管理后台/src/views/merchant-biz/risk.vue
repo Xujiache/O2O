@@ -10,16 +10,18 @@
       :search-schema="searchSchema"
       :fetch="fetchList"
       row-key="id"
+      :row-actions="rowActions"
     />
   </div>
 </template>
 
 <script setup lang="ts">
   import { ref } from 'vue'
+  import { ElMessage, ElMessageBox } from 'element-plus'
   import { merchantApi } from '@/api/business'
-  import type { BizListParams } from '@/types/business'
+  import type { BizListParams, BizMerchant } from '@/types/business'
   import { BizTable } from '@/components/biz'
-  import type { BizTableColumn } from '@/components/biz/BizTable.vue'
+  import type { BizTableColumn, BizRowAction } from '@/components/biz/BizTable.vue'
   import { fmtDateTime } from '@/utils/business/format'
 
   const tableRef = ref<InstanceType<typeof BizTable> | null>(null)
@@ -49,6 +51,36 @@
       label: '入驻时间',
       width: 170,
       formatter: (_r, _c, v) => fmtDateTime(v as string)
+    }
+  ]
+
+  const asMerchant = (row: unknown): BizMerchant => row as unknown as BizMerchant
+
+  const rowActions: BizRowAction[] = [
+    {
+      label: '封禁',
+      type: 'danger',
+      auth: 'biz:merchant:risk:ban',
+      hidden: (row) => asMerchant(row).bizStatus === 0,
+      onClick: async (row) => {
+        const m = asMerchant(row)
+        await ElMessageBox.confirm(`确认封禁商户「${m.name}」?`, '提示', { type: 'warning' })
+        await merchantApi.ban(m.id)
+        ElMessage.success('已封禁')
+        tableRef.value?.reload()
+      }
+    },
+    {
+      label: '解封',
+      type: 'success',
+      auth: 'biz:merchant:risk:ban',
+      hidden: (row) => asMerchant(row).bizStatus !== 0,
+      onClick: async (row) => {
+        const m = asMerchant(row)
+        await merchantApi.unban(m.id)
+        ElMessage.success('已解封')
+        tableRef.value?.reload()
+      }
     }
   ]
 

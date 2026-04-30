@@ -53,6 +53,7 @@
     {
       label: '通过',
       type: 'success',
+      auth: 'biz:risk:order:pass',
       onClick: async (row) => {
         const item = row as unknown as BizRiskOrder
         await riskApi.riskOrderReview(item.orderNo, 'pass')
@@ -63,6 +64,7 @@
     {
       label: '拦截',
       type: 'danger',
+      auth: 'biz:risk:order:block',
       onClick: async (row) => {
         const item = row as unknown as BizRiskOrder
         await riskApi.riskOrderReview(item.orderNo, 'block')

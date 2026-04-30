@@ -239,3 +239,71 @@ ORDER BY r.sort;
 -- 按钮 28 + 接口 16 = 92 条 permission；运营/财务/客服/风控四角色合计
 -- ~120 条 role_permission 关联）
 -- ============================================================================
+
+
+-- ============================================================================
+-- P9-Sprint2 增量 (W2.D.4)：biz:* 命名空间权限码与 5 角色映射
+-- 等价于 13_rbac_biz_codes.sql migration（保持 seed 与 migration 等价
+-- 以便本地 reset 后单文件完整重建）。命名空间对齐管理后台 v-biz-auth /
+-- BizRowAction.auth / BizBatchAction.auth；映射理由见 P9_PERM_AUDIT_REPORT_V2.md
+-- 角色对齐：6001 super_admin (auto pass) / 6002 operation (≈R_ADMIN) /
+--          6003 finance / 6004 cs / 6005 risk_control (≈R_AUDIT)
+-- ============================================================================
+
+-- biz:* 按钮码（resource_type=2）：15 条
+INSERT IGNORE INTO `permission`
+  (`id`,`tenant_id`,`parent_id`,`resource_type`,`resource_code`,`resource_name`,`action`,`icon`,`sort`,`status`,`is_deleted`,`created_at`,`updated_at`)
+VALUES
+  (4900, 1, 3901, 2, 'biz:system:admin:create',        '新增管理员',     'create', NULL, 10, 1, 0, NOW(3), NOW(3)),
+  (4901, 1, 3901, 2, 'biz:system:role:create',         '新增角色',       'create', NULL, 20, 1, 0, NOW(3), NOW(3)),
+  (4902, 1, 3901, 2, 'biz:system:role:assign',         '分配角色权限',   'update', NULL, 30, 1, 0, NOW(3), NOW(3)),
+  (4903, 1, 3901, 2, 'biz:system:permission:edit',     '编辑权限',       'update', NULL, 40, 1, 0, NOW(3), NOW(3)),
+  (4904, 1, 3902, 2, 'biz:system:dict:edit',           '字典维护',       'update', NULL, 10, 1, 0, NOW(3), NOW(3)),
+  (4905, 1, 3903, 2, 'biz:system:operation-log:view',  '操作日志查看',   'list',   NULL, 10, 1, 0, NOW(3), NOW(3)),
+  (4906, 1, 3803, 2, 'biz:finance:withdraw:audit',     '提现审核',       'update', NULL, 20, 1, 0, NOW(3), NOW(3)),
+  (4907, 1, 3805, 2, 'biz:finance:invoice:audit',      '发票审核',       'update', NULL, 20, 1, 0, NOW(3), NOW(3)),
+  (4908, 1, 3912, 2, 'biz:cs:arbitration:judge',       '仲裁判定',       'update', NULL, 20, 1, 0, NOW(3), NOW(3)),
+  (4909, 1, 3911, 2, 'biz:cs:ticket:close',            '工单关闭',       'update', NULL, 30, 1, 0, NOW(3), NOW(3)),
+  (4910, 1, 3913, 2, 'biz:risk:order:pass',            '风险订单通过',   'update', NULL, 30, 1, 0, NOW(3), NOW(3)),
+  (4911, 1, 3913, 2, 'biz:risk:order:block',           '风险订单拦截',   'update', NULL, 40, 1, 0, NOW(3), NOW(3)),
+  (4912, 1, 3301, 2, 'biz:merchant:audit',             '商户入驻审核',   'update', NULL, 30, 1, 0, NOW(3), NOW(3)),
+  (4913, 1, 3304, 2, 'biz:merchant:risk:ban',          '商户封禁',       'update', NULL, 10, 1, 0, NOW(3), NOW(3)),
+  (4914, 1, 3203, 2, 'biz:user:risk:ban',              '用户封禁',       'update', NULL, 30, 1, 0, NOW(3), NOW(3));
+
+-- 6002 operation (≈R_ADMIN)：系统管理（非 permission:edit）+ 商户 + 用户
+INSERT IGNORE INTO `role_permission`
+  (`role_id`,`permission_id`,`tenant_id`,`is_deleted`,`created_at`,`updated_at`)
+VALUES
+  (6002, 4900, 1, 0, NOW(3), NOW(3)),
+  (6002, 4901, 1, 0, NOW(3), NOW(3)),
+  (6002, 4904, 1, 0, NOW(3), NOW(3)),
+  (6002, 4905, 1, 0, NOW(3), NOW(3)),
+  (6002, 4912, 1, 0, NOW(3), NOW(3)),
+  (6002, 4913, 1, 0, NOW(3), NOW(3)),
+  (6002, 4914, 1, 0, NOW(3), NOW(3));
+
+-- 6003 finance：财务全集
+INSERT IGNORE INTO `role_permission`
+  (`role_id`,`permission_id`,`tenant_id`,`is_deleted`,`created_at`,`updated_at`)
+VALUES
+  (6003, 4906, 1, 0, NOW(3), NOW(3)),
+  (6003, 4907, 1, 0, NOW(3), NOW(3));
+
+-- 6004 cs：客服 + 风险订单审核
+INSERT IGNORE INTO `role_permission`
+  (`role_id`,`permission_id`,`tenant_id`,`is_deleted`,`created_at`,`updated_at`)
+VALUES
+  (6004, 4908, 1, 0, NOW(3), NOW(3)),
+  (6004, 4909, 1, 0, NOW(3), NOW(3)),
+  (6004, 4910, 1, 0, NOW(3), NOW(3)),
+  (6004, 4911, 1, 0, NOW(3), NOW(3));
+
+-- 6005 risk_control (≈R_AUDIT)：审核员（仅商户入驻审核）
+INSERT IGNORE INTO `role_permission`
+  (`role_id`,`permission_id`,`tenant_id`,`is_deleted`,`created_at`,`updated_at`)
+VALUES
+  (6005, 4912, 1, 0, NOW(3), NOW(3));
+
+-- ============================================================================
+-- END P9-Sprint2 增量 —— biz:* 15 条权限码 + 14 条角色映射（super_admin 自动放行）
+-- ============================================================================

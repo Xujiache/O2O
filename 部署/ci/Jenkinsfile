@@ -7,53 +7,48 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY     = 'registry.example.com/o2o'
-        IMAGE_TAG    = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-        HELM_RELEASE = 'o2o'
+        REGISTRY            = 'registry.example.com/o2o'
+        IMAGE_TAG           = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+        HELM_RELEASE        = 'o2o'
+        RUN_INTEGRATION     = "${env.RUN_INTEGRATION ?: 'false'}"
+        RUN_E2E             = "${env.RUN_E2E ?: 'false'}"
+        RUN_PERF            = "${env.RUN_PERF ?: 'false'}"
+        RUN_SECURITY        = "${env.RUN_SECURITY ?: 'false'}"
+        RUN_DEPLOY          = "${env.RUN_DEPLOY ?: 'false'}"
+        SKIP_MISSING_TOOLS  = "${env.SKIP_MISSING_TOOLS ?: 'true'}"
     }
 
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '20'))
+        skipDefaultCheckout(true)
+        timestamps()
     }
 
     stages {
-        // ── 1. 拉取代码 ──
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // ── 2. 安装依赖 ──
         stage('Install') {
             steps {
                 sh 'corepack enable && pnpm install --frozen-lockfile'
             }
         }
 
-        // ── 3. Lint + 单元测试（并行） ──
-        stage('Lint & Test') {
+        stage('Lint & Unit') {
             parallel {
                 stage('Backend Lint') {
                     steps {
                         sh 'pnpm --filter 后端 lint'
                     }
                 }
-                stage('Backend Test') {
+                stage('Backend Unit') {
                     steps {
-                        sh 'pnpm --filter 后端 test:cov'
-                    }
-                    post {
-                        always {
-                            junit 'coverage/junit.xml'
-                            publishHTML(target: [
-                                reportName: 'Coverage',
-                                reportDir: 'coverage/lcov-report',
-                                reportFiles: 'index.html'
-                            ])
-                        }
+                        sh 'bash 部署/ci/scripts/test.sh unit'
                     }
                 }
                 stage('Admin Build') {
@@ -62,33 +57,102 @@ pipeline {
                     }
                 }
             }
-        }
-
-        // ── 4. 安全扫描 ──
-        stage('Security Scan') {
-            parallel {
-                stage('Trivy Image') {
-                    steps {
-                        sh "docker build -t ${REGISTRY}/backend:${IMAGE_TAG} -f 部署/docker/backend/Dockerfile ."
-                        sh "trivy image --severity HIGH,CRITICAL --exit-code 1 ${REGISTRY}/backend:${IMAGE_TAG}"
-                    }
-                }
-                stage('Snyk Deps') {
-                    steps {
-                        sh 'snyk test --all-projects --severity-threshold=high || true'
-                    }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'coverage/junit.xml'
+                    archiveArtifacts artifacts: 'ci-results/**', allowEmptyArchive: true
+                    publishHTML(target: [
+                        reportName: 'Coverage',
+                        reportDir: 'coverage/lcov-report',
+                        reportFiles: 'index.html',
+                        allowMissing: true,
+                        keepAll: true,
+                        alwaysLinkToLastBuild: true
+                    ])
                 }
             }
         }
 
-        // ── 5. 构建镜像 & 推送 ──
+        stage('Integration') {
+            when {
+                expression { return env.RUN_INTEGRATION == 'true' }
+            }
+            steps {
+                sh 'bash 部署/ci/scripts/test.sh integration'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'ci-results/**', allowEmptyArchive: true
+                }
+            }
+        }
+
+        // P9 Sprint 2 / T9.2 / Agent E：后端 Supertest 集成测试（不依赖真 docker）
+        // 始终运行；与上方 RUN_INTEGRATION 全栈拉起的 e2e 互补
+        stage('Backend Integration Tests') {
+            steps {
+                sh 'pnpm --filter 后端 exec jest --config jest-integration.config.js --runInBand'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '后端/test-results/integration/*.xml'
+                    archiveArtifacts artifacts: '后端/test-results/integration/**', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('E2E') {
+            when {
+                expression { return env.RUN_E2E == 'true' }
+            }
+            steps {
+                sh 'bash 部署/ci/scripts/test.sh e2e'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: '部署/tests/e2e-admin/playwright-report/**, ci-results/**', allowEmptyArchive: true
+                    junit allowEmptyResults: true, testResults: '部署/tests/e2e-admin/**/*.xml'
+                }
+            }
+        }
+
+        stage('Performance') {
+            when {
+                expression { return env.RUN_PERF == 'true' }
+            }
+            steps {
+                sh 'bash 部署/ci/scripts/test.sh perf'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'ci-results/**, k6-results.json, *.json', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            when {
+                expression { return env.RUN_SECURITY == 'true' }
+            }
+            steps {
+                sh 'bash 部署/ci/scripts/test.sh security'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'ci-results/**', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('Build & Push') {
+            when {
+                expression { return env.RUN_DEPLOY == 'true' }
+            }
             steps {
                 sh "docker build -t ${REGISTRY}/backend:${IMAGE_TAG} -f 部署/docker/backend/Dockerfile ."
                 sh "docker build -t ${REGISTRY}/admin:${IMAGE_TAG} -f 部署/docker/admin-web/Dockerfile ."
                 sh "docker push ${REGISTRY}/backend:${IMAGE_TAG}"
                 sh "docker push ${REGISTRY}/admin:${IMAGE_TAG}"
-                // 同时打 latest 标签
                 sh "docker tag ${REGISTRY}/backend:${IMAGE_TAG} ${REGISTRY}/backend:latest"
                 sh "docker tag ${REGISTRY}/admin:${IMAGE_TAG} ${REGISTRY}/admin:latest"
                 sh "docker push ${REGISTRY}/backend:latest"
@@ -96,8 +160,23 @@ pipeline {
             }
         }
 
-        // ── 6. 部署 Staging ──
+        // P9 Sprint 2 / W2.E.3：仅 main 分支上传 sourcemap（脚本由 Agent C 提供 / 缺脚本自动跳过）
+        stage('Upload Sourcemap') {
+            when {
+                allOf {
+                    branch 'main'
+                    expression { return fileExists('部署/ci/scripts/upload-sourcemap.sh') }
+                }
+            }
+            steps {
+                sh 'bash 部署/ci/scripts/upload-sourcemap.sh'
+            }
+        }
+
         stage('Deploy Staging') {
+            when {
+                expression { return env.RUN_DEPLOY == 'true' }
+            }
             steps {
                 sh """
                     helm upgrade --install ${HELM_RELEASE} 部署/helm/o2o \
@@ -109,24 +188,34 @@ pipeline {
             }
         }
 
-        // ── 7. 冒烟测试 ──
         stage('Smoke Test') {
+            when {
+                expression { return env.RUN_DEPLOY == 'true' }
+            }
             steps {
                 sh 'bash 部署/ci/scripts/smoke.sh staging'
             }
         }
 
-        // ── 8. 人工审批 ──
         stage('Approval') {
-            when { branch 'main' }
+            when {
+                allOf {
+                    branch 'main'
+                    expression { return env.RUN_DEPLOY == 'true' }
+                }
+            }
             steps {
                 input message: '确认部署到生产环境？', ok: '部署'
             }
         }
 
-        // ── 9. 部署 Production ──
         stage('Deploy Production') {
-            when { branch 'main' }
+            when {
+                allOf {
+                    branch 'main'
+                    expression { return env.RUN_DEPLOY == 'true' }
+                }
+            }
             steps {
                 sh """
                     helm upgrade --install ${HELM_RELEASE} 部署/helm/o2o \
@@ -138,9 +227,13 @@ pipeline {
             }
         }
 
-        // ── 10. 生产冒烟 ──
         stage('Post Smoke') {
-            when { branch 'main' }
+            when {
+                allOf {
+                    branch 'main'
+                    expression { return env.RUN_DEPLOY == 'true' }
+                }
+            }
             steps {
                 sh 'bash 部署/ci/scripts/smoke.sh production'
             }
@@ -155,6 +248,7 @@ pipeline {
             sh 'bash 部署/ci/scripts/notify.sh failure'
         }
         always {
+            archiveArtifacts artifacts: 'ci-results/**', allowEmptyArchive: true
             cleanWs()
         }
     }

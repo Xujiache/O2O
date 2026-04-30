@@ -4,15 +4,16 @@
  * @desc 用户中心模块（C 端 + 商户 + 骑手 + 管理员 + 黑名单 + 资质 + 操作日志）
  * @author 员工 B
  *
- * 5 个 Controller：UserController / AddressController / MerchantController /
- *                  RiderController / AdminController
- * 7 个 Service：UserService / AddressService / MerchantService / RiderService /
- *               AdminService / BlacklistService / QualificationService（+ 内部 OperationLogService）
+ * 6 个 Controller：UserController / AddressController / MerchantController /
+ *                  MerchantStaffController / RiderController / AdminController
+ * 8 个 Service：UserService / AddressService / MerchantService / MerchantStaffService /
+ *               RiderService / AdminService / BlacklistService / QualificationService
+ *               （+ 内部 OperationLogService）
  *
  * 依赖：
  *   - HealthModule（REDIS_CLIENT）
  *   - AuthModule（JwtAuthGuard / UserTypeGuard / PermissionGuard，已在 AuthModule 内 export 并标记 @Global）
- *   - TypeOrmModule.forFeature 实体清单：14 D1 entity（除 MerchantStaff 本期未直用，仍声明便于后续扩展）+ OperationLog
+ *   - TypeOrmModule.forFeature 实体清单：14 D1 entity + Shop + OperationLog
  */
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
@@ -30,6 +31,7 @@ import {
   RiderQualification,
   Role,
   RolePermission,
+  Shop,
   User,
   UserAddress
 } from '../../entities'
@@ -37,11 +39,15 @@ import { HealthModule } from '../../health/health.module'
 import { AdminController } from './controllers/admin.controller'
 import { AddressController } from './controllers/address.controller'
 import { MerchantController } from './controllers/merchant.controller'
+import { MerchantStaffController } from './controllers/merchant-staff.controller'
 import { RiderController } from './controllers/rider.controller'
 import { UserController } from './controllers/user.controller'
+import { MessageModule } from '../message/message.module'
+import { HealthCertExpireJob } from './jobs/health-cert-expire.job'
 import { AddressService } from './services/address.service'
 import { AdminService } from './services/admin.service'
 import { BlacklistService } from './services/blacklist.service'
+import { MerchantStaffService } from './services/merchant-staff.service'
 import { MerchantService } from './services/merchant.service'
 import { OperationLogService } from './services/operation-log.service'
 import { QualificationService } from './services/qualification.service'
@@ -51,6 +57,8 @@ import { UserService } from './services/user.service'
 @Module({
   imports: [
     HealthModule,
+    /* P9 Sprint 2 / W2.B.3：HealthCertExpireJob 依赖 MessageService 推送 */
+    MessageModule,
     TypeOrmModule.forFeature([
       User,
       UserAddress,
@@ -66,6 +74,7 @@ import { UserService } from './services/user.service'
       AdminRole,
       RolePermission,
       Blacklist,
+      Shop,
       OperationLog
     ])
   ],
@@ -73,6 +82,7 @@ import { UserService } from './services/user.service'
     UserController,
     AddressController,
     MerchantController,
+    MerchantStaffController,
     RiderController,
     AdminController
   ],
@@ -80,16 +90,20 @@ import { UserService } from './services/user.service'
     UserService,
     AddressService,
     MerchantService,
+    MerchantStaffService,
     QualificationService,
     RiderService,
     AdminService,
     BlacklistService,
-    OperationLogService
+    OperationLogService,
+    /* P9 Sprint 2 / W2.B.3（P9-P1-12）：健康证到期 15 天前提醒 cron */
+    HealthCertExpireJob
   ],
   exports: [
     UserService,
     AddressService,
     MerchantService,
+    MerchantStaffService,
     QualificationService,
     RiderService,
     AdminService,

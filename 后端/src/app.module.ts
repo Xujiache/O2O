@@ -34,6 +34,8 @@ import { AdminModule } from './modules/admin/admin.module'
 import { StatsModule } from './modules/stats/stats.module'
 import { CustomerModule } from './modules/customer/customer.module'
 import { SysConfigModule } from './modules/system/sys-config.module'
+/* P9/W2.C.1：Sentry 全局上报模块（紧跟 ConfigModule 注册，确保 ConfigService ready） */
+import { SentryModule } from './modules/sentry/sentry.module'
 
 /**
  * 根模块
@@ -53,6 +55,8 @@ import { SysConfigModule } from './modules/system/sys-config.module'
       validationOptions: { allowUnknown: true, abortEarly: false },
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env']
     }),
+    // ===== 全局可观测（紧跟 ConfigModule，需要 ConfigService 注入）=====
+    SentryModule,
     // ===== 基础设施 =====
     DatabaseModule,
     QueuesModule,

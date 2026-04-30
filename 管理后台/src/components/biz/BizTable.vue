@@ -33,13 +33,10 @@
       </template>
     </BizSearchForm>
 
-    <div
-      v-if="batchActions && batchActions.length && selected.length > 0"
-      class="biz-table__batch-bar"
-    >
+    <div v-if="visibleBatchActions.length && selected.length > 0" class="biz-table__batch-bar">
       <span class="biz-table__batch-count">已选 {{ selected.length }} 项：</span>
       <ElButton
-        v-for="action in batchActions"
+        v-for="action in visibleBatchActions"
         :key="action.label"
         :type="action.type || 'default'"
         size="small"
@@ -60,12 +57,7 @@
       @selection-change="onSelectionChange"
       @sort-change="onSortChange"
     >
-      <ElTableColumn
-        v-if="batchActions && batchActions.length"
-        type="selection"
-        width="44"
-        align="center"
-      />
+      <ElTableColumn v-if="visibleBatchActions.length" type="selection" width="44" align="center" />
       <ElTableColumn v-if="showIndex" label="#" type="index" width="60" align="center" />
 
       <ElTableColumn
@@ -92,7 +84,7 @@
       </ElTableColumn>
 
       <ElTableColumn
-        v-if="rowActions && rowActions.length"
+        v-if="hasAnyVisibleRowAction"
         :label="$t('biz.common.actions')"
         :width="rowActionsWidth"
         :align="rowActionsAlign"
@@ -138,6 +130,7 @@
   import BizSearchForm, { type BizSearchField } from './BizSearchForm.vue'
   import BizStatus from './BizStatus.vue'
   import BizExport from './BizExport.vue'
+  import { useBizPermStore } from '@/store/modules/business'
 
   /** 列配置 */
   export interface BizTableColumn<T = Record<string, unknown>> {
@@ -259,6 +252,26 @@
 
   const visibleColumns = computed(() => props.columns.filter((c) => c.visible !== false))
 
+  /**
+   * P9-Sprint2 W2.D.2：BizRowAction / BizBatchAction 的 auth 字段权限过滤
+   * - 未声明 auth → 始终可见
+   * - auth 为 string → has(auth)
+   * - auth 为 string[] → hasAny(auth)
+   */
+  const perm = useBizPermStore()
+  function hasAuth(auth?: string | string[]): boolean {
+    if (!auth) return true
+    if (Array.isArray(auth)) return perm.hasAny(auth)
+    return perm.has(auth)
+  }
+  const visibleRowActions = computed<BizRowAction[]>(() =>
+    (props.rowActions || []).filter((a) => hasAuth(a.auth))
+  )
+  const visibleBatchActions = computed<BizBatchAction[]>(() =>
+    (props.batchActions || []).filter((a) => hasAuth(a.auth))
+  )
+  const hasAnyVisibleRowAction = computed<boolean>(() => visibleRowActions.value.length > 0)
+
   function formatCell(row: Record<string, unknown>, col: BizTableColumn): string {
     const value = col.prop ? row[col.prop] : undefined
     if (col.formatter) return col.formatter(row, col, value)
@@ -328,8 +341,7 @@
   }
 
   function resolveRowActions(row: Record<string, unknown>): BizRowAction[] {
-    if (!props.rowActions) return []
-    return props.rowActions.map((act) => {
+    return visibleRowActions.value.map((act) => {
       const hidden = typeof act.hidden === 'function' ? act.hidden(row) : !!act.hidden
       return { ...act, hidden }
     })

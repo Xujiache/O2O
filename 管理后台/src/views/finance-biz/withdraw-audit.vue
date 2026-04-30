@@ -145,6 +145,7 @@
     {
       label: '批量通过',
       type: 'success',
+      auth: 'biz:finance:withdraw:audit',
       onClick: async (selected) => {
         const candidates = selected.filter((s) => (s as unknown as BizWithdraw).status === 0)
         if (!candidates.length) {
@@ -163,6 +164,7 @@
     {
       label: '批量驳回',
       type: 'danger',
+      auth: 'biz:finance:withdraw:audit',
       onClick: async (selected) => {
         const candidates = selected.filter((s) => (s as unknown as BizWithdraw).status === 0)
         if (!candidates.length) {

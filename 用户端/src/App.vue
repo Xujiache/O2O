@@ -9,6 +9,7 @@
   import { useUserStore } from '@/store/user'
   import { useAppStore } from '@/store/app'
   import { logger } from '@/utils/logger'
+  import { setupSentry, captureException } from '@/utils/sentry'
 
   /**
    * 应用启动：恢复 token、上报启动事件、初始化 store
@@ -17,6 +18,14 @@
    * 作为 P3/P4 既有 STORAGE_KEYS 的双保险（避免老安装包升级丢登录态）
    */
   onLaunch(() => {
+    /* P9/W2.C.2：Sentry 真发送初始化（DSN 由 env 注入；空 DSN 自动跳过） */
+    const env = (import.meta as unknown as { env?: Record<string, string> }).env
+    setupSentry({
+      dsn: env?.VITE_SENTRY_DSN ?? '',
+      environment: env?.VITE_APP_ENV ?? env?.MODE ?? 'development',
+      release: env?.VITE_APP_VERSION ?? '0.1.0'
+    })
+
     const app = useAppStore()
     const user = useUserStore()
     app.initSysInfo()
@@ -39,6 +48,8 @@
   /** 全局异常 */
   onError((err) => {
     logger.error('app.error', { err: String(err) })
+    /* P9/W2.C.2：未捕获异常上报 Sentry */
+    captureException(err, { source: 'uni.onError' })
   })
 </script>
 

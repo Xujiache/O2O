@@ -37,6 +37,8 @@
 import { BullModule } from '@nestjs/bullmq'
 import { Module } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { TypeOrmModule } from '@nestjs/typeorm'
+import { SagaState } from '@/entities'
 import { DispatchModule } from '@/modules/dispatch/dispatch.module'
 import { FinanceModule } from '@/modules/finance/finance.module'
 import { MarketingModule } from '@/modules/marketing/marketing.module'
@@ -55,11 +57,14 @@ import { PaymentSagaService } from './sagas/payment-saga.service'
 import { RefundSagaService } from './sagas/refund-saga.service'
 import { SettleSagaService } from './sagas/settle-saga.service'
 import { SagaRunnerService } from './services/saga-runner.service'
+import { SagaStateService } from './services/saga-state.service'
 import { ORCHESTRATION_DLQ_QUEUE } from './types/orchestration.types'
 
 @Module({
   imports: [
     BullModule.registerQueue({ name: ORCHESTRATION_DLQ_QUEUE }),
+    /* P9 Sprint 2 / W2.B.2：SagaState 持久化（migration 12_saga_state.sql） */
+    TypeOrmModule.forFeature([SagaState]),
     UserModule,
     MessageModule,
     OrderModule,
@@ -73,6 +78,7 @@ import { ORCHESTRATION_DLQ_QUEUE } from './types/orchestration.types'
   providers: [
     ConfigService,
     SagaRunnerService,
+    SagaStateService,
     OrderSagaService,
     PaymentSagaService,
     SettleSagaService,
@@ -81,6 +87,7 @@ import { ORCHESTRATION_DLQ_QUEUE } from './types/orchestration.types'
     PaymentEventsConsumer,
     InMemoryEventsConsumer,
     OrchestrationDlqProcessor
-  ]
+  ],
+  exports: [SagaStateService]
 })
 export class OrchestrationModule {}

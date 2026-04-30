@@ -35,7 +35,9 @@
       <ElButton @click="toggleSelectAll" style="margin-left: 8px">{{
         isSelectAll ? '取消全选' : '全部选择'
       }}</ElButton>
-      <ElButton type="primary" @click="savePermission">保存</ElButton>
+      <ElButton v-biz-auth="'biz:system:role:assign'" type="primary" @click="savePermission"
+        >保存</ElButton
+      >
     </template>
   </ElDialog>
 </template>

@@ -41,8 +41,15 @@ function parseDsn(dsnStr: string): { endpoint: string; key: string; projectId: s
   }
 }
 
+/** Sentry 初始化参数 */
+export interface SentryInitOptions {
+  dsn: string
+  environment?: string
+  release?: string
+}
+
 /** 初始化 Sentry */
-export function initSentry(opt: { dsn: string; environment?: string; release?: string }): void {
+export function initSentry(opt: SentryInitOptions): void {
   if (initialized) return
   if (!opt.dsn) {
     logger.warn('sentry.init.skip', { reason: 'empty dsn' })
@@ -62,6 +69,9 @@ export function initSentry(opt: { dsn: string; environment?: string; release?: s
   initialized = true
   logger.info('sentry.init.ok', { env: environment, release, projectId })
 }
+
+/** 别名（W2.C.2 统一命名 setupSentry，与用户端 / 管理后台对齐） */
+export const setupSentry = initSentry
 
 /** 构造 envelope 头 */
 function buildAuthHeader(): string {

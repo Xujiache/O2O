@@ -1,30 +1,39 @@
 /**
  * @file sentry.ts
- * @stage P7/T7.46 (Sprint 6)
- * @desc 崩溃监控对接（Sentry HTTP envelope 简化版）
+ * @stage P9/W2.C.2 (Sprint 2) — Sentry HTTP envelope 真发送（管理后台）
+ * @desc 不依赖 @sentry/* SDK 包，手写 envelope 协议向 Sentry 上报异常 / 消息。
  *
- * 实现策略：
- *   - 不依赖 @sentry/* SDK（包大小过大，骑手端 APK ≤ 45MB 限制）
- *   - 手写 envelope HTTP 上报：仅 ~250 行 0KB SDK 增量
- *   - APP 端通过 plus.runtime.uncaughtException + Vue.config.errorHandler 捕获
- *   - 路径：${dsn 派生的 envelope endpoint}
+ * 协议参考：https://develop.sentry.dev/sdk/envelopes/
+ *   POST <dsn-host>/api/<project>/envelope/
+ *   body 三行：{header}\n{item_header}\n{event}
  *
- * @author 单 Agent V2.0 (P7 骑手端)
+ * 设计要点：
+ *   - DSN 为空时整体禁用，所有 capture 调用 no-op
+ *   - 用 fetch + keepalive 上报，页面 unload 时也能尽力发送
+ *   - 与 Vue.config.errorHandler / window.onerror / unhandledrejection 集成
+ *
+ * @author Agent C (P9 Sprint 2)
  */
-import { logger } from './logger'
 
 let initialized = false
-let dsn = ''
+let dsnUrl = ''
 let environment = 'development'
 let release = '0.1.0'
-let userCtx: { id?: string; riderNo?: string } = {}
+let userCtx: { id?: string; userType?: string } = {}
 let envelopeEndpoint = ''
 let publicKey = ''
-let projectId = ''
+
+/** Sentry 初始化参数 */
+export interface SentryInitOptions {
+  dsn: string
+  environment?: string
+  release?: string
+}
 
 /**
  * 解析 DSN
  * 格式：https://<key>@<host>/<project_id>
+ * @param dsnStr DSN 字符串
  */
 function parseDsn(dsnStr: string): { endpoint: string; key: string; projectId: string } | null {
   try {
@@ -41,43 +50,55 @@ function parseDsn(dsnStr: string): { endpoint: string; key: string; projectId: s
   }
 }
 
-/** Sentry 初始化参数 */
-export interface SentryInitOptions {
-  dsn: string
-  environment?: string
-  release?: string
-}
-
-/** 初始化 Sentry */
-export function initSentry(opt: SentryInitOptions): void {
+/**
+ * 初始化 Sentry（DSN 为空时跳过）
+ * @param opt DSN/环境/版本号
+ */
+export function setupSentry(opt: SentryInitOptions): void {
   if (initialized) return
   if (!opt.dsn) {
-    logger.warn('sentry.init.skip', { reason: 'empty dsn' })
+    console.warn('[sentry.init.skip] empty dsn')
     return
   }
   const parsed = parseDsn(opt.dsn)
   if (!parsed) {
-    logger.warn('sentry.init.skip', { reason: 'invalid dsn' })
+    console.warn('[sentry.init.skip] invalid dsn')
     return
   }
-  dsn = opt.dsn
+  dsnUrl = opt.dsn
   environment = opt.environment ?? 'development'
   release = opt.release ?? '0.1.0'
   envelopeEndpoint = parsed.endpoint
   publicKey = parsed.key
-  projectId = parsed.projectId
   initialized = true
-  logger.info('sentry.init.ok', { env: environment, release, projectId })
+
+  /* 全局兜底：window.onerror / unhandledrejection */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('error', (ev) => {
+      captureException(ev.error ?? new Error(ev.message), {
+        source: 'window.onerror',
+        filename: ev.filename,
+        lineno: ev.lineno,
+        colno: ev.colno
+      })
+    })
+    window.addEventListener('unhandledrejection', (ev) => {
+      const reason = ev.reason as unknown
+      captureException(reason instanceof Error ? reason : new Error(String(reason)), {
+        source: 'unhandledrejection'
+      })
+    })
+  }
 }
 
-/** 别名（W2.C.2 统一命名 setupSentry，与用户端 / 管理后台对齐） */
-export const setupSentry = initSentry
+/** 别名（与商户/骑手端 initSentry 命名一致） */
+export const initSentry = setupSentry
 
 /** 构造 envelope auth 头 */
 function buildAuthHeader(): string {
   return [
     'Sentry sentry_version=7',
-    `sentry_client=o2o-rider/${release}`,
+    `sentry_client=o2o-admin/${release}`,
     `sentry_key=${publicKey}`
   ].join(', ')
 }
@@ -94,11 +115,11 @@ function buildEvent(payload: {
     event_id: genEventId(),
     timestamp: Date.now() / 1000,
     platform: 'javascript',
-    sdk: { name: 'sentry.javascript.o2o-rider', version: release },
+    sdk: { name: 'sentry.javascript.o2o-admin', version: release },
     environment,
     release,
-    user: userCtx.id ? { id: userCtx.id, rider_no: userCtx.riderNo } : undefined,
-    tags: { client: 'rider' },
+    user: userCtx.id ? { id: userCtx.id, userType: userCtx.userType ?? 'admin' } : undefined,
+    tags: { client: 'admin' },
     level: payload.level ?? (payload.exception ? 'error' : 'info'),
     message: payload.message,
     exception: payload.exception
@@ -116,15 +137,15 @@ function buildEvent(payload: {
   }
 }
 
+/** 生成 32 位 hex event id */
 function genEventId(): string {
-  /* 32 位 hex */
   const hex = '0123456789abcdef'
   let s = ''
   for (let i = 0; i < 32; i++) s += hex[Math.floor(Math.random() * 16)]
   return s
 }
 
-/** 上报 envelope */
+/** 上报 envelope（fetch keepalive） */
 function sendEnvelope(event: Record<string, unknown>): void {
   if (!initialized) return
   try {
@@ -141,50 +162,47 @@ function sendEnvelope(event: Record<string, unknown>): void {
     })
     const body = `${headerStr}\n${itemHeader}\n${eventStr}\n`
 
-    uni.request({
-      url: envelopeEndpoint,
+    void fetch(envelopeEndpoint, {
       method: 'POST',
-      data: body,
-      header: {
+      body,
+      headers: {
         'Content-Type': 'application/x-sentry-envelope',
         'X-Sentry-Auth': buildAuthHeader()
       },
-      success: () => {
-        logger.info('sentry.send.ok', { eventId: event.event_id })
-      },
-      fail: (err) => {
-        logger.warn('sentry.send.fail', { err: String(err.errMsg ?? '') })
-      }
+      keepalive: true
+    }).catch((err: unknown) => {
+      console.warn('[sentry.send.fail]', String(err))
     })
   } catch (e) {
-    logger.warn('sentry.send.error', { e: String(e) })
+    console.warn('[sentry.send.error]', String(e))
   }
 }
 
-/** 上报异常 */
+/**
+ * 上报异常
+ * @param err 任意被抛出的对象
+ * @param ctx 业务上下文（页面 / 路由 / 自定义字段）
+ */
 export function captureException(err: unknown, ctx?: Record<string, unknown>): void {
-  if (!initialized) {
-    logger.warn('sentry.error.not-init', { e: String(err) })
-    return
-  }
+  if (!initialized) return
   const errorObj = err as { name?: string; message?: string; stack?: string }
   const event = buildEvent({
     type: 'event',
     exception: {
       type: errorObj?.name ?? 'Error',
       value: errorObj?.message ?? String(err),
-      stacktrace: errorObj?.stack
-        ? {
-            frames: parseStackFrames(errorObj.stack)
-          }
-        : undefined
+      stacktrace: errorObj?.stack ? { frames: parseStackFrames(errorObj.stack) } : undefined
     },
     extra: ctx
   })
   sendEnvelope(event)
 }
 
-/** 上报自定义消息 */
+/**
+ * 上报自定义消息
+ * @param message 消息文本
+ * @param level 级别（info/warning/error）
+ */
 export function captureMessage(
   message: string,
   level: 'info' | 'warning' | 'error' = 'info'
@@ -194,8 +212,11 @@ export function captureMessage(
   sendEnvelope(event)
 }
 
-/** 设置用户上下文（登录后调用） */
-export function setSentryUser(user: { id: string; riderNo?: string }): void {
+/**
+ * 设置用户上下文（管理员登录后调用）
+ * @param user 管理员身份
+ */
+export function setSentryUser(user: { id: string; userType?: string }): void {
   userCtx = user
 }
 
@@ -211,11 +232,7 @@ function parseStackFrames(stack: string): { filename: string; function: string; 
   for (const line of lines) {
     const m = line.match(/at\s+(.+?)\s+\((.+):(\d+):\d+\)/)
     if (m) {
-      frames.push({
-        function: m[1],
-        filename: m[2],
-        lineno: Number(m[3])
-      })
+      frames.push({ function: m[1], filename: m[2], lineno: Number(m[3]) })
     }
   }
   return frames.reverse()
@@ -223,10 +240,5 @@ function parseStackFrames(stack: string): { filename: string; function: string; 
 
 /** 当前 Sentry 状态（调试用） */
 export function getSentryState(): { initialized: boolean; dsn: string; environment: string } {
-  return { initialized, dsn, environment }
-}
-
-/** 防 unused-warning：dsn 用于调试展示 */
-export function getSentryDsn(): string {
-  return dsn
+  return { initialized, dsn: dsnUrl, environment }
 }

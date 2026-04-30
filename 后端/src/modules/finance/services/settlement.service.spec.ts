@@ -537,4 +537,256 @@ describe('SettlementService', () => {
       expect(vo.flowNo).toBe('F100')
     })
   })
+
+  /**
+   * P9/Sprint2 W2.A.2 增补：scan / listFinishedOrdersOf 主路径覆盖
+   * 目标：把 settlement.service.ts 的 lines 从 67.26% 推到 ≥ 70%
+   */
+  describe('listFinishedOrdersOf', () => {
+    let dataSourceQuery: jest.Mock
+    beforeEach(() => {
+      dataSourceQuery = jest.fn()
+      ;(service as unknown as { dataSource: { query: jest.Mock } }).dataSource.query =
+        dataSourceQuery
+    })
+
+    it('返回外卖 + 跑腿订单合并', async () => {
+      /* 先 information_schema.TABLES 返回所有候选表存在；最简：每次都返回输入表全部 */
+      dataSourceQuery.mockImplementation(async (sql: string, params: unknown[]) => {
+        if (sql.includes('information_schema.TABLES')) {
+          return (params as string[]).map((t) => ({ TABLE_NAME: t }))
+        }
+        if (sql.includes('order_takeout')) {
+          return [
+            {
+              order_no: 'T20260419000000001',
+              shop_id: 'S1',
+              merchant_id: 'M1',
+              rider_id: 'R1',
+              pay_amount: '100.00',
+              finished_at: new Date(),
+              shop_snapshot: { cityCode: '110000' }
+            }
+          ]
+        }
+        if (sql.includes('order_errand')) {
+          return [
+            {
+              order_no: 'E20260419000000001',
+              rider_id: 'R2',
+              pay_amount: '50.00',
+              finished_at: new Date(),
+              pickup_snapshot: { cityCode: '310000' },
+              delivery_snapshot: null
+            }
+          ]
+        }
+        return []
+      })
+
+      const inputs = await service.listFinishedOrdersOf(new Date(), 0)
+      expect(inputs.length).toBeGreaterThanOrEqual(2)
+      const types = inputs.map((i) => i.orderType)
+      expect(types).toEqual(expect.arrayContaining([OrderTypeEnum.TAKEOUT, OrderTypeEnum.ERRAND]))
+    })
+
+    it('information_schema 返回 0 表 -> 跳过 union 查询', async () => {
+      dataSourceQuery.mockImplementation(async (sql: string) => {
+        if (sql.includes('information_schema.TABLES')) {
+          return [] /* 无表存在 */
+        }
+        throw new Error('SQL 不应被调用')
+      })
+      const inputs = await service.listFinishedOrdersOf(new Date(), 0)
+      expect(inputs).toEqual([])
+    })
+
+    it('shop_snapshot 是 string -> parseJson 反序列化', async () => {
+      dataSourceQuery.mockImplementation(async (sql: string, params: unknown[]) => {
+        if (sql.includes('information_schema.TABLES')) {
+          return (params as string[]).map((t) => ({ TABLE_NAME: t }))
+        }
+        if (sql.includes('order_takeout')) {
+          return [
+            {
+              order_no: 'T20260419000000002',
+              shop_id: 'S2',
+              merchant_id: 'M2',
+              rider_id: null,
+              pay_amount: '88.00',
+              finished_at: new Date(),
+              shop_snapshot: '{"cityCode":"440100"}' /* string 形态 */
+            }
+          ]
+        }
+        return []
+      })
+
+      const inputs = await service.listFinishedOrdersOf(new Date(), 0)
+      const takeout = inputs.find((i) => i.orderType === OrderTypeEnum.TAKEOUT)
+      expect(takeout?.cityCode).toBe('440100')
+    })
+
+    it('shop_snapshot 是 invalid JSON string -> parseJson 返回 null + cityCode 为 null', async () => {
+      dataSourceQuery.mockImplementation(async (sql: string, params: unknown[]) => {
+        if (sql.includes('information_schema.TABLES')) {
+          return (params as string[]).map((t) => ({ TABLE_NAME: t }))
+        }
+        if (sql.includes('order_takeout')) {
+          return [
+            {
+              order_no: 'T20260419000000003',
+              shop_id: 'S3',
+              merchant_id: 'M3',
+              rider_id: null,
+              pay_amount: '20.00',
+              finished_at: new Date(),
+              shop_snapshot: 'not-valid-json'
+            }
+          ]
+        }
+        return []
+      })
+
+      const inputs = await service.listFinishedOrdersOf(new Date(), 0)
+      const takeout = inputs.find((i) => i.orderType === OrderTypeEnum.TAKEOUT)
+      expect(takeout?.cityCode).toBeNull()
+    })
+
+    it('errand pickup_snapshot null + delivery_snapshot 命中 cityCode', async () => {
+      dataSourceQuery.mockImplementation(async (sql: string, params: unknown[]) => {
+        if (sql.includes('information_schema.TABLES')) {
+          return (params as string[]).map((t) => ({ TABLE_NAME: t }))
+        }
+        if (sql.includes('order_errand')) {
+          return [
+            {
+              order_no: 'E20260419000000099',
+              rider_id: 'R9',
+              pay_amount: '30.00',
+              finished_at: new Date(),
+              pickup_snapshot: null,
+              delivery_snapshot: { cityCode: '320100' }
+            }
+          ]
+        }
+        return []
+      })
+
+      const inputs = await service.listFinishedOrdersOf(new Date(), 0)
+      const errand = inputs.find((i) => i.orderType === OrderTypeEnum.ERRAND)
+      expect(errand?.cityCode).toBe('320100')
+    })
+  })
+
+  /**
+   * P9/Sprint2 W2.A.2 增补：computeForOrder 跳过分支补充
+   * 覆盖 line 192/196/221 等已存在记录跳过路径
+   */
+  describe('computeForOrder skip branches', () => {
+    it('已存在 PENDING rider 记录 -> 跳过 rider', async () => {
+      recordRepoFind.mockResolvedValue([
+        { targetType: SettlementTargetTypeEnum.RIDER, status: SettlementRecordStatusEnum.PENDING }
+      ])
+      matchRulesForOrder.mockResolvedValue({
+        merchant: buildRule({ id: 'RM' }),
+        rider: buildRule({ id: 'RR' }),
+        platform: buildRule({ id: 'RP' })
+      })
+
+      const input: SettlementInput = {
+        orderNo: 'T20260419000010001',
+        orderType: OrderTypeEnum.TAKEOUT,
+        merchantId: 'M1',
+        riderId: 'R1',
+        shopId: 'S1',
+        cityCode: '110000',
+        payAmount: '100.00',
+        finishedAt: new Date()
+      }
+
+      const result = await service.computeForOrder(input)
+      /* rider 跳过 -> merchant + platform = 2 */
+      expect(result.records).toHaveLength(2)
+      const targets = result.records.map((r) => r.targetType)
+      expect(targets).not.toContain(SettlementTargetTypeEnum.RIDER)
+    })
+
+    it('已存在 EXECUTED platform 记录 -> 跳过 platform', async () => {
+      recordRepoFind.mockResolvedValue([
+        {
+          targetType: SettlementTargetTypeEnum.PLATFORM,
+          status: SettlementRecordStatusEnum.EXECUTED
+        }
+      ])
+      matchRulesForOrder.mockResolvedValue({
+        merchant: null,
+        rider: buildRule({ id: 'RR' }),
+        platform: buildRule({ id: 'RP' })
+      })
+
+      const input: SettlementInput = {
+        orderNo: 'E20260419000010002',
+        orderType: OrderTypeEnum.ERRAND,
+        merchantId: null,
+        riderId: 'R1',
+        shopId: null,
+        cityCode: '110000',
+        payAmount: '50.00',
+        finishedAt: new Date()
+      }
+
+      const result = await service.computeForOrder(input)
+      /* platform 跳过 -> 仅 rider = 1 */
+      expect(result.records).toHaveLength(1)
+    })
+
+    it('platform 计算金额=0 -> 跳过 platform（skippedReasons 含 ≤0）', async () => {
+      matchRulesForOrder.mockResolvedValue({
+        merchant: null,
+        rider: null,
+        platform: buildRule({ rate: '0.00', fixedFee: '0.00', minFee: '0.00', maxFee: '0.00' })
+      })
+
+      const input: SettlementInput = {
+        orderNo: 'T20260419000010003',
+        orderType: OrderTypeEnum.TAKEOUT,
+        merchantId: null,
+        riderId: null,
+        shopId: 'S1',
+        cityCode: '110000',
+        payAmount: '100.00',
+        finishedAt: new Date()
+      }
+
+      const result = await service.computeForOrder(input)
+      expect(result.records).toHaveLength(0)
+      expect(result.skippedReasons.some((r) => r.includes('platform') && r.includes('≤0'))).toBe(
+        true
+      )
+    })
+
+    it('rider 计算金额=0 -> 跳过 rider', async () => {
+      matchRulesForOrder.mockResolvedValue({
+        merchant: null,
+        rider: buildRule({ rate: '0.00', fixedFee: '0.00', minFee: '0.00', maxFee: '0.00' }),
+        platform: null
+      })
+
+      const input: SettlementInput = {
+        orderNo: 'E20260419000010004',
+        orderType: OrderTypeEnum.ERRAND,
+        merchantId: null,
+        riderId: 'R1',
+        shopId: null,
+        cityCode: '110000',
+        payAmount: '100.00',
+        finishedAt: new Date()
+      }
+
+      const result = await service.computeForOrder(input)
+      expect(result.records).toHaveLength(0)
+      expect(result.skippedReasons.some((r) => r.includes('rider') && r.includes('≤0'))).toBe(true)
+    })
+  })
 })

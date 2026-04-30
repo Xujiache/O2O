@@ -58,6 +58,10 @@ import { UserErrandOrderController } from './controllers/user-errand-order.contr
 import { UserOrderController } from './controllers/user-order.controller'
 import { ORDER_EVENTS_PUBLISHER } from './events/order-events.constants'
 import { orderEventsPublisherProvider } from './events/order-events.publisher'
+import {
+  OrderDeliveredFinishJob,
+  ORDER_DELIVERED_FINISH_QUEUE
+} from './jobs/order-delivered-finish.job'
 import { OrderCancelTimeoutProcessor } from './processors/order-cancel-timeout.processor'
 import { ErrandPricingService } from './services/errand-pricing.service'
 import { OrderErrandService } from './services/order-errand.service'
@@ -95,7 +99,9 @@ const reviewOrderServiceProvider: Provider = {
      *   故无模块循环依赖，无需 forwardRef）
      */
     DispatchModule,
-    BullModule.registerQueue({ name: 'order-cancel-timeout' })
+    BullModule.registerQueue({ name: 'order-cancel-timeout' }),
+    /* P9 Sprint 2 / W2.B.1（P9-P1-04）：5min 自动 finished 延迟队列 */
+    BullModule.registerQueue({ name: ORDER_DELIVERED_FINISH_QUEUE })
   ],
   controllers: [
     UserOrderController,
@@ -116,6 +122,7 @@ const reviewOrderServiceProvider: Provider = {
     OrderStateMachine,
     orderEventsPublisherProvider,
     OrderCancelTimeoutProcessor,
+    OrderDeliveredFinishJob,
     reviewOrderServiceProvider
   ],
   exports: [
@@ -125,7 +132,9 @@ const reviewOrderServiceProvider: Provider = {
     OrderErrandService,
     OrderPreCheckService,
     REVIEW_DEP_ORDER_SERVICE,
-    ORDER_EVENTS_PUBLISHER
+    ORDER_EVENTS_PUBLISHER,
+    /* P9 Sprint 2 / W2.B.1：暴露给 OrchestrationModule 的 OrderSagaService 调度入队 */
+    OrderDeliveredFinishJob
   ]
 })
 export class OrderModule {}

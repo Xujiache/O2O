@@ -122,5 +122,10 @@ export const envValidationSchema = Joi.object({
   //      已在上方第 87~93 行（A/C 增量段）声明；此处不再重复，避免对象字面量重复键
   ADMIN_SIGN_APP_KEY: Joi.string().allow('').default(''),
   ADMIN_SIGN_APP_SECRET: Joi.string().allow('').default(''),
-  ADMIN_APP_KEYS: Joi.string().allow('').default('')
+  ADMIN_APP_KEYS: Joi.string().allow('').default(''),
+
+  // ===== P9/W2.C.1 Sentry（可选；DSN 为空则 SentryService 静默禁用）=====
+  SENTRY_DSN: Joi.string().allow('').default(''),
+  SENTRY_RELEASE: Joi.string().allow('').default(''),
+  SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.1)
 })

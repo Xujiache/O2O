@@ -102,6 +102,7 @@
     {
       label: '封禁',
       type: 'danger',
+      auth: 'biz:user:risk:ban',
       hidden: (row) => asUser(row).status === 2,
       onClick: (row) => {
         const u = asUser(row)
@@ -113,6 +114,7 @@
     {
       label: '解封',
       type: 'success',
+      auth: 'biz:user:risk:ban',
       hidden: (row) => asUser(row).status !== 2,
       onClick: async (row) => {
         await userApi.unban(asUser(row).id)
@@ -126,6 +128,7 @@
     {
       label: '批量封禁',
       type: 'danger',
+      auth: 'biz:user:risk:ban',
       onClick: async (selected) => {
         let ok = 0
         let fail = 0
