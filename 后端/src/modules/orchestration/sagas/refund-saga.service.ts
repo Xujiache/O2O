@@ -1,33 +1,38 @@
 /**
  * @file refund-saga.service.ts
- * @stage P4/T4.49（Sprint 8）
- * @desc RefundSucceed 事件 → 反向分账（如已分账）+ 通知用户
+ * @stage P4/T4.49（Sprint 8）+ P9 Sprint 3 / W3.B.1（反向分账落地）
+ * @desc RefundSucceed 事件 → 反向分账 + 通知用户
  * @author 单 Agent V2.0（Subagent 7：Orchestration）
  *
  * 步骤：
- *   1. 反向分账：本期未实现 SettlementService.reverseForOrder，先查现有 settlement_record
- *      已 EXECUTED 的部分仅打 warn 标 TODO（P9 接入完整反向链路）
+ *   1. 反向分账：调用 SettlementService.reverseForOrder
+ *      - 查 settlement_record WHERE order_no=? AND status=EXECUTED
+ *      - 逐条反向：accountService.refund(targetOwner, settle_amount, REFUND_REVERSE)
+ *      - UPDATE settlement_record.status=REVERSED 已撤销
+ *      - 部分失败 best-effort：仅 logger.error，不阻断后续步骤（saga 仍标 ok）
  *   2. 通知用户"退款成功"
  *
- * 简化（任务 §5.1）：
- *   - 反向分账实现复杂（需 AccountService.spend + 重写 settlement_record.status=3 已撤销 + 流水）
- *     本期先打 TODO，仅记录撤销意图；P9 完善
+ * 注意：
+ *   - SettlementService 通过 OrchestrationModule.imports → FinanceModule.exports 注入
+ *   - 全程 BigNumber，不使用 number 算金额
  *   - 库存恢复 / 券恢复 由 OrderCanceled Saga 处理（已支付的退款必先有 OrderCanceled）
  */
 
 import { Injectable, Logger, Optional } from '@nestjs/common'
+import { SettlementService } from '@/modules/finance/services/settlement.service'
 import { MessageService } from '@/modules/message/message.service'
+import { SagaRunnerService } from '../services/saga-runner.service'
 import {
   type PaymentEventEnvelope,
   type SagaContext,
   type SagaRunResult,
   type SagaStep
 } from '../types/orchestration.types'
-import { SagaRunnerService } from '../services/saga-runner.service'
 
 /** RefundSaga 状态 */
 interface RefundSagaState {
-  reverseSettlementMarked: boolean
+  reversed: number
+  failed: number
   notified: boolean
 }
 
@@ -37,6 +42,7 @@ export class RefundSagaService {
 
   constructor(
     private readonly runner: SagaRunnerService,
+    private readonly settlementService: SettlementService,
     @Optional() private readonly messageService?: MessageService
   ) {}
 
@@ -59,17 +65,20 @@ export class RefundSagaService {
 
     const steps: SagaStep<SagaContext<RefundSagaState>>[] = [
       {
-        name: 'MarkReverseSettlement',
+        name: 'ReverseSettlement',
         run: async (ctx) => {
-          /* TODO P9：完整反向分账链路：
-             - 查 settlement_record WHERE order_no=? AND status=1 EXECUTED
-             - 对每条 record：accountService.spend(targetOwner, settle_amount, REFUND_REVERSE)
-             - UPDATE settlement_record SET status=3 已撤销 + reverse_flow_no
-             本期仅打 warn 标记 TODO，确保流程 saga 可正常完成 */
-          this.logger.warn(
-            `[REFUND-SAGA] 反向分账 TODO P9 order=${payload.orderNo} payNo=${payload.payNo} amount=${payload.amount}`
+          /* P9 Sprint 3：调 SettlementService.reverseForOrder 真实反向分账
+             部分失败仅落 logger.error，不抛错（reverseForOrder 内部已吞异常），
+             saga 整体仍可向后推进通知步骤 */
+          const result = await this.settlementService.reverseForOrder(
+            payload.orderNo,
+            payload.amount
           )
-          ctx.state.reverseSettlementMarked = true
+          ctx.state.reversed = result.reversed
+          ctx.state.failed = result.failed
+          this.logger.log(
+            `[REFUND-SAGA] reverseForOrder order=${payload.orderNo} reversed=${result.reversed} failed=${result.failed}`
+          )
         }
       },
       {
@@ -101,7 +110,8 @@ export class RefundSagaService {
     ]
 
     return this.runner.execute('RefundSucceedSaga', envelope, steps, {
-      reverseSettlementMarked: false,
+      reversed: 0,
+      failed: 0,
       notified: false
     })
   }

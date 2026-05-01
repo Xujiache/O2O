@@ -30,6 +30,12 @@ import { Coupon, UserCoupon } from '@/entities'
 import { REDIS_CLIENT } from '@/health/redis.provider'
 import { OperationLogService } from '@/modules/user/services/operation-log.service'
 import { MessageService } from '@/modules/message/message.service'
+import { SysConfigService } from '@/modules/system/sys-config.service'
+import {
+  DEFAULT_EVENT_COUPON_CONFIG,
+  SYS_KEY_EVENT_COUPON_PREFIX,
+  type EventCouponConfig
+} from '@/modules/system/sys-config.keys'
 import { SnowflakeId } from '@/utils'
 import {
   type BestMatchQueryDto,
@@ -74,7 +80,13 @@ export class UserCouponService {
     private readonly couponService: CouponService,
     private readonly operationLogService: OperationLogService,
     /* MessageService 可选注入：marketing.module 后续整合时若未导入 MessageModule 不影响构造 */
-    @Optional() private readonly messageService?: MessageService
+    @Optional() private readonly messageService?: MessageService,
+    /**
+     * P9 Sprint 3 / W3.A.1：sys_config 全量接入。
+     *   - issueByEvent 由占位 mock 切换为读 sys_config(marketing.event_coupon.<eventType>)
+     *   - 缺失（旧 spec / 本地无 SysConfigModule）回退空数组（mock 行为兼容）
+     */
+    @Optional() private readonly sysConfigService?: SysConfigService
   ) {}
 
   /* ==========================================================================
@@ -770,16 +782,34 @@ export class UserCouponService {
   }
 
   /**
-   * 读取触发式发放配置（mock 占位：本期固定返回空数组）
+   * 读取触发式发放配置
    *
-   * 真实实现路径（Sprint 8）：
-   *   const row = await sysConfigRepo.findOne({ key: `marketing.event_coupon.${eventType}` })
-   *   return row ? JSON.parse(row.value) as EventCouponConfig[] : []
+   * P9 Sprint 3 / W3.A.1：sys_config 真实接入。
+   *   - 命中：sys_config(config_key=`marketing.event_coupon.${eventType}`).config_value 解析成 EventCouponConfig
+   *   - 缺失：回退默认空数组（mock 行为兼容，issueByEvent 仍 success=true / issued=0）
+   *   - 解析异常：仅 warn + 回退空数组（不阻塞业务）
    */
-  private async fetchEventConfig(
-    _eventType: IssueEventType
-  ): Promise<Array<{ couponId: string; qty: number }>> {
-    return Promise.resolve([])
+  private async fetchEventConfig(eventType: IssueEventType): Promise<EventCouponConfig> {
+    if (!this.sysConfigService) return DEFAULT_EVENT_COUPON_CONFIG
+    try {
+      const cfg = await this.sysConfigService.get<EventCouponConfig | null>(
+        `${SYS_KEY_EVENT_COUPON_PREFIX}${eventType}`,
+        null
+      )
+      if (!cfg || !Array.isArray(cfg)) return DEFAULT_EVENT_COUPON_CONFIG
+      return cfg.filter(
+        (item) =>
+          item != null &&
+          typeof item.couponId === 'string' &&
+          typeof item.qty === 'number' &&
+          item.qty > 0
+      )
+    } catch (err) {
+      this.logger.warn(
+        `[fetchEventConfig] 读 sys_config 失败 event=${eventType}：${(err as Error).message}`
+      )
+      return DEFAULT_EVENT_COUPON_CONFIG
+    }
   }
 
   /**

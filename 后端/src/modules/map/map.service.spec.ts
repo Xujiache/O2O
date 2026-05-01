@@ -202,4 +202,121 @@ describe('MapService', () => {
       expect(cached.x).toBe(1)
     })
   })
+
+  /* ====================================================================
+   * P9 Sprint 3 / W3.A.2 增补：覆盖剩余 geocode / regeocode / routing 路径
+   * 目标：将 map.service.ts lines 从 69.30% 提升至 ≥ 70%
+   * ==================================================================== */
+
+  describe('geocode', () => {
+    it('缓存命中 → 不调高德', async () => {
+      const cached = {
+        lng: 116.48,
+        lat: 39.99,
+        level: 'poi',
+        formatted: '北京站',
+        cityCode: '010',
+        adcode: '110105'
+      }
+      const md5 = require('crypto').createHash('md5').update('北京站|北京').digest('hex')
+      redisStore.set(`geocode:${md5}`, JSON.stringify(cached))
+      const r = await service.geocode('北京站', '北京')
+      expect(amapMock.geocode).not.toHaveBeenCalled()
+      expect(r).toEqual(cached)
+    })
+
+    it('缓存 miss → 调高德 + 回写缓存', async () => {
+      const r = await service.geocode('望京 SOHO', '北京')
+      expect(amapMock.geocode).toHaveBeenCalledWith('望京 SOHO', '北京')
+      expect(r.lat).toBe(39.99)
+      const md5 = require('crypto').createHash('md5').update('望京 SOHO|北京').digest('hex')
+      expect(redisStore.has(`geocode:${md5}`)).toBe(true)
+    })
+
+    it('city 参数为空时按空字符串组 key', async () => {
+      await service.geocode('世贸天阶')
+      expect(amapMock.geocode).toHaveBeenCalledWith('世贸天阶', undefined)
+    })
+  })
+
+  describe('regeocode', () => {
+    it('lng/lat 越界 → 400', async () => {
+      await expect(service.regeocode(999, 999)).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('缓存命中 → 不调高德', async () => {
+      const cached = {
+        formatted: '朝阳区某街',
+        province: '北京市',
+        city: '北京市',
+        district: '朝阳区',
+        cityCode: '010',
+        adcode: '110105'
+      }
+      redisStore.set('regeocode:116.48,39.99', JSON.stringify(cached))
+      const r = await service.regeocode(116.48, 39.99)
+      expect(amapMock.regeocode).not.toHaveBeenCalled()
+      expect(r).toEqual(cached)
+    })
+
+    it('缓存 miss → 调高德 + 写回缓存（坐标精度截断 5 位）', async () => {
+      const r = await service.regeocode(116.481234567, 39.991234567)
+      expect(amapMock.regeocode).toHaveBeenCalledWith(116.48123, 39.99123)
+      expect(r.district).toBe('朝阳区')
+      expect(redisStore.has('regeocode:116.48123,39.99123')).toBe(true)
+    })
+  })
+
+  describe('routing', () => {
+    it('缓存 miss → 调高德 + 回写', async () => {
+      const r = await service.routing(116.4, 39.9, 116.5, 39.91, 'driving')
+      expect(amapMock.routing).toHaveBeenCalledWith(116.4, 39.9, 116.5, 39.91, 'driving')
+      expect(r.distance).toBe(8000)
+      expect(redisStore.size).toBeGreaterThanOrEqual(1)
+    })
+
+    it('缓存命中 → 不调高德', async () => {
+      const cached = {
+        distance: 5000,
+        duration: 600,
+        path: [
+          [116.4, 39.9],
+          [116.45, 39.905]
+        ],
+        type: 'driving'
+      }
+      redisStore.set('route:116.40000,39.90000:116.50000,39.91000:driving', JSON.stringify(cached))
+      const r = await service.routing(116.4, 39.9, 116.5, 39.91, 'driving')
+      expect(amapMock.routing).not.toHaveBeenCalled()
+      expect(r.distance).toBe(5000)
+    })
+  })
+
+  describe('distance 入参校验', () => {
+    it('非数值坐标 → 400', async () => {
+      await expect(service.distance(NaN, 39.9, 116.5, 39.91, '0' as never)).rejects.toMatchObject({
+        status: 400
+      })
+    })
+  })
+
+  describe('queryTrack edge', () => {
+    it('rows 为空 → pointCount=0 / totalDistanceM=0', async () => {
+      poolQueryMock.mockResolvedValue({ rows: [] })
+      const r = await service.queryTrack('R0', 'T0')
+      expect(r.pointCount).toBe(0)
+      expect(r.geometry.coordinates).toEqual([])
+      expect(r.properties.totalDistanceM).toBe(0)
+      expect(r.properties.avgSpeedKmh).toBe(0)
+    })
+
+    it('fromTs / toTs 时间过滤分支', async () => {
+      poolQueryMock.mockResolvedValue({ rows: [] })
+      await service.queryTrack('R1', 'T1', '2026-04-01T00:00:00Z', '2026-04-30T00:00:00Z')
+      expect(poolQueryMock).toHaveBeenCalled()
+      const sql = poolQueryMock.mock.calls[0][0] as string
+      expect(sql).toContain('time >= $3')
+      expect(sql).toContain('time <= $4')
+    })
+  })
 })

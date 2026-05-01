@@ -19,7 +19,7 @@
  * 注意：本服务**不触发**真实订单合并，仅维护拼单状态机；订单合并由 Sprint 3 Order 模块订阅事件
  */
 
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import type Redis from 'ioredis'
 import { Repository } from 'typeorm'
@@ -30,6 +30,23 @@ import { generateBizNo } from '@/utils'
 import { type GroupBuyStatus, type GroupBuyVo, type QueryMyGroupBuyDto } from '../dto/group-buy.dto'
 import { type GroupBuyRule } from '../dto/promotion.dto'
 import { PromotionRuleValidatorService } from './promotion-rule-validator.service'
+import { GroupBuySagaService } from '@/modules/orchestration/services/group-buy-saga.service'
+
+/**
+ * 成团事件 payload（GroupBuyAchieved）
+ *
+ * 字段：
+ *   - groupId         拼单 ID（promotionId:groupNo 形式，便于 saga 反查）
+ *   - leaderOrderNo   团长订单号（合并后的主单；MVP：取参与者首个 order_no 占位）
+ *   - memberOrderNos  团员订单号列表（不含团长）
+ *   - achievedAt      成团时刻 ms
+ */
+export interface GroupBuyAchievedEvent {
+  groupId: string
+  leaderOrderNo: string
+  memberOrderNos: string[]
+  achievedAt: number
+}
 
 /* ============================================================================
  * Redis Key 工厂
@@ -53,7 +70,12 @@ export class GroupBuyService {
   constructor(
     @InjectRepository(Promotion) private readonly promotionRepo: Repository<Promotion>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    private readonly ruleValidator: PromotionRuleValidatorService
+    private readonly ruleValidator: PromotionRuleValidatorService,
+    /**
+     * 拼单成团 → 多单合并 saga（@Optional 避免单测 / mock 模式强依赖）
+     * marketing.module providers 注入；运行时缺失仅 logger.warn
+     */
+    @Optional() private readonly groupBuySaga?: GroupBuySagaService
   ) {}
 
   /**
@@ -125,6 +147,18 @@ export class GroupBuyService {
       this.logger.log(
         `拼单成团：promo=${promotionId} group=${targetGroupNo} size=${currentSize}/${rule.groupSize}`
       )
+      /* W3.D.2：成团事件 → 触发多单合并 saga（best-effort，吞异常） */
+      const participants = await this.safeSMembers(groupKey)
+      const orderNos = await this.collectMemberOrderNos(promotionId, targetGroupNo, participants)
+      const leaderOrderNo = orderNos[0] ?? ''
+      const memberOrderNos = orderNos.slice(1)
+      const event: GroupBuyAchievedEvent = {
+        groupId: `${promotionId}:${targetGroupNo}`,
+        leaderOrderNo,
+        memberOrderNos,
+        achievedAt: Date.now()
+      }
+      await this.publishGroupBuyAchieved(event)
     }
 
     /* 写用户索引（含 TTL） */
@@ -366,6 +400,59 @@ export class GroupBuyService {
       await this.redis.expire(key, ttlSeconds)
     } catch (err) {
       this.logger.warn(`Redis EXPIRE ${key} 失败：${(err as Error).message}`)
+    }
+  }
+
+  /* ==========================================================================
+   * W3.D.2：成团事件
+   * ========================================================================== */
+
+  /**
+   * 收集成员订单号列表
+   * 参数：promotionId / groupNo / participants 已加入团的 userId 列表
+   * 返回值：orderNo[]（首个为团长；为空时上层跳过 merge）
+   *
+   * 设计：拼单 V1 阶段团成员的订单号写在 `groupbuy:order:{promotionId}:{groupNo}` 列表里；
+   *      若该列表为空则视为旧版团（无 order 关联），返回空数组让 saga 兜底跳过。
+   */
+  private async collectMemberOrderNos(
+    promotionId: string,
+    groupNo: string,
+    participants: string[]
+  ): Promise<string[]> {
+    if (participants.length === 0) return []
+    const orderListKey = `groupbuy:order:${promotionId}:${groupNo}`
+    try {
+      const list = await this.redis.lrange(orderListKey, 0, -1)
+      return list.filter((s): s is string => typeof s === 'string' && s.length > 0)
+    } catch (err) {
+      this.logger.warn(`Redis LRANGE ${orderListKey} 失败：${(err as Error).message}`)
+      return []
+    }
+  }
+
+  /**
+   * 发布成团事件（吞异常）
+   * 参数：event
+   * 返回值：void
+   */
+  private async publishGroupBuyAchieved(event: GroupBuyAchievedEvent): Promise<void> {
+    if (!this.groupBuySaga) {
+      this.logger.debug(
+        `[GROUP-BUY] saga 未注入，跳过 group=${event.groupId}（订单号 ${event.leaderOrderNo}）`
+      )
+      return
+    }
+    if (!event.leaderOrderNo) {
+      this.logger.debug(`[GROUP-BUY] 团 ${event.groupId} 无订单号，跳过 saga 触发`)
+      return
+    }
+    try {
+      await this.groupBuySaga.handleGroupBuyAchieved(event)
+    } catch (err) {
+      this.logger.warn(
+        `[GROUP-BUY] saga 触发失败 group=${event.groupId}：${err instanceof Error ? err.message : String(err)}`
+      )
     }
   }
 }

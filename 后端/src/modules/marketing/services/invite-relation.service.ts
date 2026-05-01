@@ -38,6 +38,11 @@ import { BizErrorCode, BusinessException, PageResult, makePageResult } from '@/c
 import { InviteRelation, UserPointFlow } from '@/entities'
 import { REDIS_CLIENT } from '@/health/redis.provider'
 import { SnowflakeId } from '@/utils'
+import { SysConfigService } from '@/modules/system/sys-config.service'
+import {
+  DEFAULT_INVITE_REWARD_POINT,
+  SYS_KEY_INVITE_REWARD_POINT
+} from '@/modules/system/sys-config.keys'
 import {
   BindInviterDto,
   InvitePageVo,
@@ -50,8 +55,6 @@ import { UserPointService } from './user-point.service'
 
 /** 邀请奖励 biz_type（与 user_point_flow 对齐） */
 const BIZ_TYPE_INVITE = 4
-/** 默认邀请奖励积分（sys_config 落地前的常量；后续可注入） */
-const DEFAULT_INVITE_REWARD_POINT = 100
 /** 邀请统计缓存 TTL */
 const INVITE_STAT_CACHE_TTL_SECONDS = 60
 /** 邀请统计缓存 Key 前缀 */
@@ -88,7 +91,12 @@ export class InviteRelationService {
      *   - @Optional() 保证 module 整合次序无关；
      *   - 缺失时 completeReward 仅发积分、不发券（不阻塞主流程）。
      */
-    @Optional() private readonly userCouponService?: UserCouponService
+    @Optional() private readonly userCouponService?: UserCouponService,
+    /**
+     * P9 Sprint 3 / W3.A.1：sys_config 全量接入。
+     *   - @Optional() 保证旧测试 / mock 模式不阻塞；缺失时回退默认奖励积分常量。
+     */
+    @Optional() private readonly sysConfigService?: SysConfigService
   ) {}
 
   /* ============================================================
@@ -103,15 +111,28 @@ export class InviteRelationService {
    *
    * 本期方案：仅校验 inviteCode 格式 + 反解 inviter_id；inviter 昵称/头像返回 mask 占位
    */
-  getInvitePage(inviteCode: string): InvitePageVo {
+  async getInvitePage(inviteCode: string): Promise<InvitePageVo> {
     const inviterId = this.decodeInviteCode(inviteCode)
+    const point = await this.resolveRewardPoint()
     return {
       inviteCode,
       inviterId,
       inviterNickname: this.maskInviterId(inviterId),
       inviterAvatar: null,
-      rewardSlogan: `好友邀请你注册即赠 ${DEFAULT_INVITE_REWARD_POINT} 积分`
+      rewardSlogan: `好友邀请你注册即赠 ${point} 积分`
     }
+  }
+
+  /**
+   * 解析邀请奖励积分（sys_config marketing.invite.reward_point；缺失时回退默认 100）
+   */
+  private async resolveRewardPoint(): Promise<number> {
+    if (!this.sysConfigService) return DEFAULT_INVITE_REWARD_POINT
+    const v = await this.sysConfigService.get<number>(
+      SYS_KEY_INVITE_REWARD_POINT,
+      DEFAULT_INVITE_REWARD_POINT
+    )
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : DEFAULT_INVITE_REWARD_POINT
   }
 
   /**
@@ -266,7 +287,7 @@ export class InviteRelationService {
    *   6) 失效 inviter stat 缓存
    */
   async completeReward(inviteeId: string, orderNo: string, overridePoint?: number): Promise<void> {
-    const point = overridePoint ?? DEFAULT_INVITE_REWARD_POINT
+    const point = overridePoint ?? (await this.resolveRewardPoint())
     const relation = await this.relationRepo.findOne({
       where: { inviteeId, isDeleted: 0 }
     })

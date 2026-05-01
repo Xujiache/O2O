@@ -184,6 +184,113 @@ export function signTestJwt(
 }
 
 /**
+ * Sprint 3 / W3.E.2：Review 服务族 mock 集合
+ *
+ * 一次性返回 Review 域 7 个 service 的 jest.fn() 替身，便于 e2e-spec 直接 spread 注入
+ * 所有方法在 beforeEach 中可统一 mockReset()
+ */
+export function mockReviewService(): {
+  reviewSvc: { listForAdmin: jest.Mock; hide: jest.Mock; top: jest.Mock }
+  replySvc: { adminReply: jest.Mock }
+  appealSvc: { listForAdmin: jest.Mock; audit: jest.Mock }
+  complaintSvc: { listForAdmin: jest.Mock; handle: jest.Mock; escalate: jest.Mock }
+  ticketSvc: {
+    listForAdmin: jest.Mock
+    assign: jest.Mock
+    reply: jest.Mock
+    close: jest.Mock
+  }
+  arbSvc: { listForAdmin: jest.Mock; judge: jest.Mock }
+  afterSaleSvc: { listForAdmin: jest.Mock; adminResolve: jest.Mock }
+} {
+  return {
+    reviewSvc: { listForAdmin: jest.fn(), hide: jest.fn(), top: jest.fn() },
+    replySvc: { adminReply: jest.fn() },
+    appealSvc: { listForAdmin: jest.fn(), audit: jest.fn() },
+    complaintSvc: { listForAdmin: jest.fn(), handle: jest.fn(), escalate: jest.fn() },
+    ticketSvc: {
+      listForAdmin: jest.fn(),
+      assign: jest.fn(),
+      reply: jest.fn(),
+      close: jest.fn()
+    },
+    arbSvc: { listForAdmin: jest.fn(), judge: jest.fn() },
+    afterSaleSvc: { listForAdmin: jest.fn(), adminResolve: jest.fn() }
+  }
+}
+
+/**
+ * Sprint 3 / W3.E.2：Marketing 服务族 mock 集合
+ *
+ * 一次性返回 Marketing 域 5 个 service 的 jest.fn() 替身
+ */
+export function mockMarketingService(): {
+  couponSvc: {
+    adminCreate: jest.Mock
+    adminList: jest.Mock
+    adminDetail: jest.Mock
+    adminUpdate: jest.Mock
+    adminDelete: jest.Mock
+    publicAvailableList: jest.Mock
+  }
+  userCouponSvc: {
+    receive: jest.Mock
+    list: jest.Mock
+    bestMatch: jest.Mock
+    adminIssue: jest.Mock
+  }
+  promotionSvc: {
+    create: jest.Mock
+    update: jest.Mock
+    updateStatus: jest.Mock
+    forceStop: jest.Mock
+    softDelete: jest.Mock
+    listForAdmin: jest.Mock
+    detail: jest.Mock
+  }
+  redPacketSvc: {
+    create: jest.Mock
+    adminList: jest.Mock
+    adminDetail: jest.Mock
+    adminCancel: jest.Mock
+  }
+  inviteSvc: { bind: jest.Mock; listMyInvites: jest.Mock; getMyStat: jest.Mock }
+} {
+  return {
+    couponSvc: {
+      adminCreate: jest.fn(),
+      adminList: jest.fn(),
+      adminDetail: jest.fn(),
+      adminUpdate: jest.fn(),
+      adminDelete: jest.fn(),
+      publicAvailableList: jest.fn()
+    },
+    userCouponSvc: {
+      receive: jest.fn(),
+      list: jest.fn(),
+      bestMatch: jest.fn(),
+      adminIssue: jest.fn()
+    },
+    promotionSvc: {
+      create: jest.fn(),
+      update: jest.fn(),
+      updateStatus: jest.fn(),
+      forceStop: jest.fn(),
+      softDelete: jest.fn(),
+      listForAdmin: jest.fn(),
+      detail: jest.fn()
+    },
+    redPacketSvc: {
+      create: jest.fn(),
+      adminList: jest.fn(),
+      adminDetail: jest.fn(),
+      adminCancel: jest.fn()
+    },
+    inviteSvc: { bind: jest.fn(), listMyInvites: jest.fn(), getMyStat: jest.fn() }
+  }
+}
+
+/**
  * in-memory ioredis mock：覆盖最常用 string / hash / set / expire / del / eval / pipeline
  *
  * 注：复杂场景请在测试体内自行 jest.fn() 覆盖；本 mock 仅为快速 wire-up

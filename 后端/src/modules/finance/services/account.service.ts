@@ -291,6 +291,54 @@ export class AccountService {
   }
 
   /**
+   * 退款反向分账（P9 Sprint 3 / W3.B.1 新增）
+   *
+   * 用途：
+   *   - 由 SettlementService.reverseForOrder 调用，把已分账的资金从商户/骑手/平台账户
+   *     回收（OUT 流水，biz_type=REFUND_REVERSE 9）
+   *   - 与 spend 行为一致（balance -= amount，total_expense += amount），
+   *     差异在于强制 bizType 入参 + 默认 remark + 可选 idempotencyKey 留位
+   *
+   * 入参：
+   *   - ownerType / ownerId  目标账户主体（自动 getOrCreate）
+   *   - amount               金额（元，2 位小数 string；必须 > 0）
+   *   - bizType              FlowBizType（约定 REFUND_REVERSE；保留入参以便未来调用方覆盖）
+   *   - options              relatedNo / remark / opAdminId
+   *   - idempotencyKey       预留参数；当前实现未启用（DB uk_flow_no + 上游 SETNX 已兜底）
+   *
+   * 返回值：AccountOpResult（最新账户 + 新流水）
+   *
+   * 行为：
+   *   - 内部走 casApplyDelta 单事务（与 spend 复用 CAS 机制 + 写流水）
+   *   - balance < amount → BIZ_BALANCE_INSUFFICIENT（由 tryCasOnce 抛）
+   */
+  async refund(
+    ownerType: AccountOwnerType,
+    ownerId: string,
+    amount: string,
+    bizType: FlowBizType,
+    options: AccountOpOptions = {},
+    /* eslint-disable-next-line @typescript-eslint/no-unused-vars -- 预留幂等键参数 */
+    idempotencyKey?: string
+  ): Promise<AccountOpResult> {
+    const amt = this.assertPositiveAmount(amount, 'amount')
+    const acc = await this.getOrCreateAccount(ownerType, ownerId)
+    return this.casApplyDelta({
+      accountId: acc.id,
+      deltaBalance: amt.negated(),
+      deltaFrozen: new BigNumber(0),
+      deltaIncome: new BigNumber(0),
+      deltaExpense: amt,
+      direction: FlowDirectionEnum.OUT,
+      bizType,
+      amount: amt,
+      relatedNo: options.relatedNo ?? null,
+      remark: options.remark ?? '退款反向分账',
+      opAdminId: options.opAdminId ?? null
+    })
+  }
+
+  /**
    * 提现打款实际出账（frozen -= amount，total_expense += amount）
    *
    * 用途：提现 status=4 已打款时调用；从 frozen 直接消减并计入累计支出

@@ -15,13 +15,19 @@
 
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
+import BigNumber from 'bignumber.js'
 import type Redis from 'ioredis'
 import { DataSource, Repository } from 'typeorm'
 import { BizErrorCode, BusinessException, type PageMeta } from '@/common'
 import { Shop } from '@/entities'
 import { REDIS_CLIENT } from '@/health/redis.provider'
 import { OrderShardingHelper } from '../order-sharding.helper'
-import { OrderTypeEnum, type OrderCoreRecord, type OrderType } from '../types/order.types'
+import {
+  OrderTakeoutStatusEnum,
+  OrderTypeEnum,
+  type OrderCoreRecord,
+  type OrderType
+} from '../types/order.types'
 import {
   type AdminOrderQueryDto,
   type MerchantOrderQueryDto,
@@ -173,6 +179,168 @@ export class OrderService {
       select: ['id']
     })
     return rows.map((r) => r.id)
+  }
+
+  /* ==========================================================================
+   * W3.D.2：拼单成团 → 多单合并
+   * ========================================================================== */
+
+  /**
+   * 拼单成团合并多单：把 memberOrderNos 的明细 / 金额合并到 leaderOrderNo，
+   *   member 订单标记 MERGED（写入 cancel_reason='MERGED:<leaderOrderNo>'）
+   *
+   * 参数：
+   *   - orderNos       全量订单号列表（首位通常为 leader；缺失时取传入第一个）
+   *   - leaderOrderNo  团长订单号（合并后的主单）
+   * 返回值：{ mergedOrderNo: string }
+   *
+   * 行为：
+   *   1. 仅外卖（OrderTakeout）支持合并；跑腿不合并
+   *   2. 加载所有订单 → 校验：均为外卖 + status ∈ [PENDING_PAY, PENDING_ACCEPT] + 同一店铺
+   *   3. 合并 OrderTakeoutItem 全部 reassign 到 leader（更新 order_no）
+   *   4. leader.totalAmount / payAmount / goodsAmount 累加（BigNumber）
+   *   5. members 订单 status=CANCELED + cancel_reason='MERGED:<leaderOrderNo>'
+   *      （entity 无 parent_order_no 字段；用 cancel_reason 标记便于审计）
+   *   6. 全程事务；任一步失败 rollback
+   *
+   * 异常：
+   *   - 50001 订单号非法
+   *   - 10300 订单不存在
+   *   - 10303 订单状态不允许合并
+   *   - 10301 订单类型 / 店铺不一致
+   */
+  async mergeForGroup(
+    orderNos: string[],
+    leaderOrderNo: string
+  ): Promise<{ mergedOrderNo: string }> {
+    if (!leaderOrderNo) {
+      throw new BusinessException(BizErrorCode.SYSTEM_INTERNAL_ERROR, 'leaderOrderNo 为空')
+    }
+    const allNos = Array.from(new Set([leaderOrderNo, ...orderNos])).filter(
+      (s) => typeof s === 'string' && s.length > 0
+    )
+    if (allNos.length < 2) {
+      throw new BusinessException(
+        BizErrorCode.BIZ_ORDER_STATE_NOT_ALLOWED,
+        '合并至少需要 2 个订单号'
+      )
+    }
+
+    /* 反查 yyyymm 用 leader（同月分表，假设拼单成员同月下单） */
+    const leaderYyyymm = OrderShardingHelper.yyyymmFromOrderNo(leaderOrderNo)
+    if (!leaderYyyymm) {
+      throw new BusinessException(
+        BizErrorCode.SYSTEM_INTERNAL_ERROR,
+        `订单号 ${leaderOrderNo} 非法`
+      )
+    }
+    const mainTbl = OrderShardingHelper.tableName(
+      'order_takeout',
+      this.dateFromYyyymm(leaderYyyymm)
+    )
+    const itemTbl = OrderShardingHelper.tableName(
+      'order_takeout_item',
+      this.dateFromYyyymm(leaderYyyymm)
+    )
+
+    const queryRunner = this.dataSource.createQueryRunner()
+    await queryRunner.connect()
+    await queryRunner.startTransaction()
+    try {
+      /* 1) 加载并锁定订单（FOR UPDATE） */
+      const placeholders = allNos.map(() => '?').join(',')
+      const rows = await queryRunner.manager.query<
+        Array<{
+          order_no: string
+          shop_id: string
+          status: number
+          pay_status: number
+          goods_amount: string
+          pay_amount: string
+        }>
+      >(
+        `SELECT order_no, shop_id, status, pay_status, goods_amount, pay_amount
+         FROM \`${mainTbl}\` WHERE order_no IN (${placeholders}) AND is_deleted = 0 FOR UPDATE`,
+        allNos
+      )
+      if (rows.length !== allNos.length) {
+        throw new BusinessException(
+          BizErrorCode.BIZ_ORDER_NOT_FOUND,
+          `合并订单缺失：期望 ${allNos.length} / 实际 ${rows.length}`
+        )
+      }
+
+      /* 2) 校验：状态 + 同店铺 */
+      const leaderRow = rows.find((r) => r.order_no === leaderOrderNo)
+      if (!leaderRow) {
+        throw new BusinessException(BizErrorCode.BIZ_ORDER_NOT_FOUND, '团长订单不存在')
+      }
+      const leaderShopId = leaderRow.shop_id
+      const allowedStatuses: number[] = [
+        OrderTakeoutStatusEnum.PENDING_PAY,
+        OrderTakeoutStatusEnum.PENDING_ACCEPT
+      ]
+      for (const r of rows) {
+        if (r.shop_id !== leaderShopId) {
+          throw new BusinessException(
+            BizErrorCode.BIZ_ORDER_STATE_NOT_ALLOWED,
+            `订单 ${r.order_no} 与团长店铺不一致`
+          )
+        }
+        if (!allowedStatuses.includes(Number(r.status))) {
+          throw new BusinessException(
+            BizErrorCode.BIZ_ORDER_STATE_NOT_ALLOWED,
+            `订单 ${r.order_no} 状态 ${r.status} 不允许合并`
+          )
+        }
+      }
+
+      /* 3) 累加金额（BigNumber） */
+      let totalGoods = new BigNumber(0)
+      let totalPay = new BigNumber(0)
+      for (const r of rows) {
+        totalGoods = totalGoods.plus(new BigNumber(String(r.goods_amount)))
+        totalPay = totalPay.plus(new BigNumber(String(r.pay_amount)))
+      }
+
+      /* 4) member 订单的 OrderTakeoutItem 全部转挂 leader */
+      const memberNos = allNos.filter((n) => n !== leaderOrderNo)
+      const memberPlaceholders = memberNos.map(() => '?').join(',')
+      await queryRunner.manager.query(
+        `UPDATE \`${itemTbl}\` SET order_no = ?, updated_at = NOW(3)
+         WHERE order_no IN (${memberPlaceholders}) AND is_deleted = 0`,
+        [leaderOrderNo, ...memberNos]
+      )
+
+      /* 5) leader 订单累加金额 */
+      await queryRunner.manager.query(
+        `UPDATE \`${mainTbl}\`
+         SET goods_amount = ?, pay_amount = ?, updated_at = NOW(3)
+         WHERE order_no = ? AND is_deleted = 0`,
+        [totalGoods.toFixed(2), totalPay.toFixed(2), leaderOrderNo]
+      )
+
+      /* 6) member 订单标 CANCELED + cancel_reason='MERGED:<leaderOrderNo>' */
+      const mergedTag = `MERGED:${leaderOrderNo}`.slice(0, 200)
+      await queryRunner.manager.query(
+        `UPDATE \`${mainTbl}\`
+         SET status = ?, cancel_at = NOW(3), cancel_reason = ?, updated_at = NOW(3)
+         WHERE order_no IN (${memberPlaceholders}) AND is_deleted = 0`,
+        [OrderTakeoutStatusEnum.CANCELED, mergedTag, ...memberNos]
+      )
+
+      await queryRunner.commitTransaction()
+      this.logger.log(
+        `[ORDER-MERGE] 拼单合并完成 leader=${leaderOrderNo} members=${memberNos.length} ` +
+          `pay=${totalPay.toFixed(2)} goods=${totalGoods.toFixed(2)}`
+      )
+      return { mergedOrderNo: leaderOrderNo }
+    } catch (err) {
+      await queryRunner.rollbackTransaction()
+      throw err
+    } finally {
+      await queryRunner.release()
+    }
   }
 
   /* ==========================================================================

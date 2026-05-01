@@ -170,8 +170,15 @@ function buildSwaggerGroups(app: INestApplication, config: ConfigService): void 
  * 用途：node dist/main 或 nest start
  */
 async function bootstrap(): Promise<void> {
+  /**
+   * P9 Sprint 3 / W3.C.3：rawBody=true 用于微信支付 V3 异步通知签名校验
+   *   - 微信 V3 验签依赖未被 body-parser 改写过的原始 JSON 字符串；
+   *     若 JSON.parse + JSON.stringify 重新拼接，字段顺序不一致 → 验签失败
+   *   - PaymentCallbackController 内优先读 req.rawBody，缺失时退化 JSON.stringify(body) 并 warn
+   */
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose']
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    rawBody: true
   })
   const config = app.get(ConfigService)
   const port = config.get<number>('app.port') ?? 3000

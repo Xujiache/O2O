@@ -127,5 +127,23 @@ export const envValidationSchema = Joi.object({
   // ===== P9/W2.C.1 Sentry（可选；DSN 为空则 SentryService 静默禁用）=====
   SENTRY_DSN: Joi.string().allow('').default(''),
   SENTRY_RELEASE: Joi.string().allow('').default(''),
-  SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.1)
+  SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.1),
+
+  // ===== P9/W3.C.1 WeChat Pay V3（沙箱凭证；任一关键项为空则 provider 自动降级 no-op）=====
+  WECHAT_PAY_V3_MCHID: Joi.string().allow('').default(''),
+  WECHAT_PAY_V3_APPID: Joi.string().allow('').default(''),
+  WECHAT_PAY_V3_SERIAL_NO: Joi.string().allow('').default(''),
+  WECHAT_PAY_V3_API_V3_KEY: Joi.string().allow('').default(''),
+  WECHAT_PAY_V3_PRIVATE_KEY: Joi.string().allow('').default(''),
+  WECHAT_PAY_V3_PLATFORM_PUBLIC_KEY: Joi.string().allow('').default(''),
+  WECHAT_PAY_V3_NOTIFY_URL: Joi.string().allow('').default(''),
+  WECHAT_PAY_V3_SANDBOX_BASE_URL: Joi.string().uri().default('https://api.mch.weixin.qq.com'),
+
+  // ===== P9/W3.C.2 Alipay（沙箱凭证；任一关键项为空则 provider 自动降级 no-op）=====
+  // 说明：ALIPAY_PRIVATE_KEY 已在第三方段（line ~110）声明，此处不再重复以避免对象字面量重复键
+  ALIPAY_APP_ID: Joi.string().allow('').default(''),
+  ALIPAY_PUBLIC_KEY: Joi.string().allow('').default(''),
+  ALIPAY_NOTIFY_URL: Joi.string().allow('').default(''),
+  ALIPAY_RETURN_URL: Joi.string().allow('').default(''),
+  ALIPAY_GATEWAY: Joi.string().uri().default('https://openapi-sandbox.dl.alipaydev.com/gateway.do')
 })

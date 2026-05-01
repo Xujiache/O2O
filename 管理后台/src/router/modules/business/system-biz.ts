@@ -62,6 +62,13 @@ export const bizSystemRoutes: AppRouteRecord = {
       name: 'BizSystemAppConfig',
       component: '/system-biz/app-config',
       meta: { title: 'biz.menu.systemBiz.appConfig', icon: 'ri:smartphone-line' }
+    },
+    {
+      /* P9 Sprint 3 / W3.B.2：DLQ 监控（死信队列重试 / 丢弃） */
+      path: 'dlq-monitor',
+      name: 'BizSystemDlqMonitor',
+      component: '/system-biz/dlq-monitor',
+      meta: { title: 'biz.menu.systemBiz.dlqMonitor', icon: 'ri:error-warning-line' }
     }
   ]
 }

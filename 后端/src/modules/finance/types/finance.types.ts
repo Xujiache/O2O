@@ -83,7 +83,13 @@ export type FlowDirection = (typeof FlowDirectionEnum)[keyof typeof FlowDirectio
 
 /**
  * 账户流水业务类型（account_flow.biz_type）
- *   1 订单收入 / 2 订单退款 / 3 分账 / 4 提现 / 5 充值 / 6 奖励 / 7 罚款 / 8 调整
+ *   1 订单收入 / 2 订单退款 / 3 分账 / 4 提现 / 5 充值 / 6 奖励 / 7 罚款 / 8 调整 / 9 退款反向分账
+ *
+ * 9 REFUND_REVERSE（P9 Sprint 3 新增）：
+ *   - 触发：RefundSucceed 事件 → SettlementService.reverseForOrder
+ *   - 语义：把已分账资金从商户/骑手/平台账户回收（OUT 流水）
+ *   - 与 ORDER_REFUND(2) 区分：后者是"用户支付 → 退回用户余额"；
+ *     REFUND_REVERSE 是"分账后 → 反向收回平台已发出的分账"
  */
 export const FlowBizTypeEnum = {
   ORDER_INCOME: 1,
@@ -93,7 +99,8 @@ export const FlowBizTypeEnum = {
   RECHARGE: 5,
   REWARD: 6,
   PENALTY: 7,
-  ADJUST: 8
+  ADJUST: 8,
+  REFUND_REVERSE: 9
 } as const
 
 /** FlowBizType 取值 */

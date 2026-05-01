@@ -41,6 +41,7 @@
  *   - 其他业务模块（payment / order / dispatch / review）
  */
 
+import { BullModule } from '@nestjs/bullmq'
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
@@ -49,6 +50,7 @@ import {
   AccountFlow,
   Invoice,
   Reconciliation,
+  SagaState,
   SettlementRecord,
   SettlementRule,
   WithdrawRecord
@@ -68,6 +70,11 @@ import { SettlementCronService } from './services/settlement-cron.service'
 import { SettlementRuleService } from './services/settlement-rule.service'
 import { SettlementService } from './services/settlement.service'
 import { WithdrawService } from './services/withdraw.service'
+/* P9 Sprint 3 / W3.B.1：RefundReverseSaga + SagaRunner 同地装载（避免与 OrchestrationModule 循环依赖） */
+import { RefundReverseSagaService } from '@/modules/orchestration/services/refund-saga.service'
+import { SagaRunnerService } from '@/modules/orchestration/services/saga-runner.service'
+import { SagaStateService } from '@/modules/orchestration/services/saga-state.service'
+import { ORCHESTRATION_DLQ_QUEUE } from '@/modules/orchestration/types/orchestration.types'
 
 @Module({
   imports: [
@@ -83,8 +90,13 @@ import { WithdrawService } from './services/withdraw.service'
       SettlementRecord,
       WithdrawRecord,
       Invoice,
-      Reconciliation
-    ])
+      Reconciliation,
+      /* P9 Sprint 3：本地注册 SagaState 以便 SagaStateService 在 finance 域可注入 */
+      SagaState
+    ]),
+    /* P9 Sprint 3：本地声明 orchestration-dlq 队列，让 SagaRunnerService 可在 finance 域内运行
+       与 OrchestrationModule.imports 同名队列对应同一 BullMQ Worker（同进程同 connection 单例） */
+    BullModule.registerQueue({ name: ORCHESTRATION_DLQ_QUEUE })
   ],
   controllers: [
     MerchantFinanceController,
@@ -99,8 +111,13 @@ import { WithdrawService } from './services/withdraw.service'
     SettlementCronService,
     WithdrawService,
     InvoiceService,
-    ReconciliationReportService
+    ReconciliationReportService,
+    /* P9 Sprint 3 / W3.B.1：RefundReverseSaga + 其依赖 SagaRunnerService / SagaStateService
+       本地装载避免与 OrchestrationModule 循环依赖（OrchestrationModule 已 imports FinanceModule） */
+    SagaStateService,
+    SagaRunnerService,
+    RefundReverseSagaService
   ],
-  exports: [AccountService, SettlementService, SettlementRuleService]
+  exports: [AccountService, SettlementService, SettlementRuleService, RefundReverseSagaService]
 })
 export class FinanceModule {}

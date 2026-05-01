@@ -1,6 +1,6 @@
 /**
  * @file refund.service.ts
- * @stage P4/T4.27（Sprint 4）
+ * @stage P4/T4.27（Sprint 4）+ P9 Sprint 3 / W3.B.1（确认 RefundSucceed 事件发布点）
  * @desc 退款：创建 + 三方回调处理 + 幂等
  * @author 单 Agent V2.0（Subagent 3 Payment）
  *
@@ -24,6 +24,13 @@
  *   - refund_no 唯一索引（DB 兜底）
  *   - createRefund 同 (payNo, amount, reason) 30s 内重复 SETNX 防抖
  *   - handleRefundNotify 同 outRefundNo 30s 内 SETNX 防重复回调
+ *
+ * P9 Sprint 3 / W3.B.1 事件发布确认：
+ *   - 余额支付同步成功（line 257）：safePublish('RefundSucceed', ...)
+ *   - 第三方同步成功（line 328）  ：safePublish('RefundSucceed', ...)
+ *   - 异步回调成功（line 445）    ：safePublish('RefundSucceed', ...)
+ *   - 三处均已发布；OrchestrationModule.PaymentEventsConsumer 路由到 RefundSagaService
+ *     调 SettlementService.reverseForOrder 完成反向分账闭环。
  */
 
 import { Inject, Injectable, Logger } from '@nestjs/common'

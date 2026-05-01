@@ -42,6 +42,7 @@ import {
 } from '../types/payment.types'
 import { OrderService } from '@/modules/order/services/order.service'
 import { OrderTypeEnum } from '@/modules/order/types/order.types'
+import { AlipayProvider, WechatPayV3Provider } from '../providers'
 import { BalanceService, type BalancePayResult } from './balance.service'
 import { PAYMENT_EVENTS_PUBLISHER, type PaymentEventsPublisher } from './payment-events.publisher'
 import { PaymentStateMachine } from './payment-state-machine'
@@ -132,7 +133,10 @@ export class PaymentService {
     private readonly balanceService: BalanceService,
     @Inject(PAYMENT_EVENTS_PUBLISHER)
     private readonly publisher: PaymentEventsPublisher,
-    private readonly orderService: OrderService
+    private readonly orderService: OrderService,
+    /* P9/W3.C — 真实 provider；enabled=false 时自动降级，走 adapter mock */
+    private readonly wechatProvider: WechatPayV3Provider,
+    private readonly alipayProvider: AlipayProvider
   ) {}
 
   /* ============================================================================
@@ -331,11 +335,62 @@ export class PaymentService {
       openId: input.openId
     })
 
+    /* 4.5 P9/W3.C — 若真实 provider 已配置（enabled=true），用其返回值覆盖 adapter mock；
+     *      否则保持 adapter mock 行为（本地 dev / 单测无凭证仍可跑） */
+    let prepayParamsFinal: Record<string, unknown> = adapterResult.prepayParams
+    let outTradeNoFinal: string = adapterResult.prepayId
+    let rawResponseFinal: Record<string, unknown> = adapterResult.rawResponse
+
+    if (input.payMethod === PayMethod.WX_PAY && this.wechatProvider.enabled) {
+      try {
+        const amountFen = new BigNumber(input.amount).times(100).integerValue().toNumber()
+        const real = await this.wechatProvider.jsapiPay(
+          payNo,
+          amountFen,
+          input.openId ?? '',
+          input.description ?? `订单 ${input.orderNo}`
+        )
+        outTradeNoFinal = real.prepayId
+        prepayParamsFinal = {
+          appId: real.paySign.appId,
+          timeStamp: real.paySign.timeStamp,
+          nonceStr: real.paySign.nonceStr,
+          package: real.paySign.package,
+          signType: real.paySign.signType,
+          paySign: real.paySign.paySign
+        }
+        rawResponseFinal = { realProvider: 'wechat-pay-v3', prepay_id: real.prepayId }
+      } catch (err) {
+        this.logger.error(
+          `[PAY] wechat real provider 调用失败，回退 adapter mock payNo=${payNo}：${(err as Error).message}`
+        )
+      }
+    } else if (input.payMethod === PayMethod.ALIPAY && this.alipayProvider.enabled) {
+      try {
+        const real = this.alipayProvider.pagePay(
+          payNo,
+          input.amount,
+          input.description ?? `订单 ${input.orderNo}`
+        )
+        prepayParamsFinal = {
+          formHtml: real.formHtml,
+          payUrl: real.payUrl,
+          channel,
+          clientType: input.payerClientType ?? null
+        }
+        rawResponseFinal = { realProvider: 'alipay', payUrl: real.payUrl }
+      } catch (err) {
+        this.logger.error(
+          `[PAY] alipay real provider 调用失败，回退 adapter mock payNo=${payNo}：${(err as Error).message}`
+        )
+      }
+    }
+
     /* 5. 写 raw_response + 转 PAYING（除非 adapter 已 alreadyPaid） */
     const persisted = await this.payRepo.findOne({ where: { id: recordId, isDeleted: 0 } })
     if (persisted) {
-      persisted.rawResponse = adapterResult.rawResponse
-      persisted.outTradeNo = adapterResult.prepayId
+      persisted.rawResponse = rawResponseFinal
+      persisted.outTradeNo = outTradeNoFinal
       await this.payRepo.save(persisted)
     }
 
@@ -343,9 +398,9 @@ export class PaymentService {
     if (adapterResult.alreadyPaid) {
       finalStatus = PayStatus.SUCCESS
       await this.stateMachine.transit(payNo, 'PaymentSucceed', {
-        outTradeNo: adapterResult.prepayId,
+        outTradeNo: outTradeNoFinal,
         paidAt: Date.now(),
-        rawResponse: adapterResult.rawResponse
+        rawResponse: rawResponseFinal
       })
     } else {
       finalStatus = PayStatus.PAYING
@@ -361,13 +416,19 @@ export class PaymentService {
     /* 6. 发 PaymentCreated 事件 */
     await this.safePublishCreated(payNo, input, finalStatus)
 
+    /* mockMode：真实 provider 启用即视为非 mock；否则取决于 adapter.mockMode */
+    const realEnabled =
+      (input.payMethod === PayMethod.WX_PAY && this.wechatProvider.enabled) ||
+      (input.payMethod === PayMethod.ALIPAY && this.alipayProvider.enabled)
+    const mockMode = realEnabled ? false : adapter.mockMode
+
     return {
       payNo,
       payMethod: input.payMethod,
       status: finalStatus,
       amount: input.amount,
-      prepayParams: adapterResult.prepayParams,
-      mockMode: adapter.mockMode
+      prepayParams: prepayParamsFinal,
+      mockMode
     }
   }
 

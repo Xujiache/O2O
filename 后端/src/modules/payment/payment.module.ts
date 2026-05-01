@@ -65,10 +65,12 @@ import {
   ReconciliationListAdminController,
   RefundAdminController
 } from './controllers/payment-admin.controller'
+import { PaymentCallbackController } from './controllers/payment-callback.controller'
 import { PaymentController } from './controllers/payment.controller'
 import { RefundNotifyController } from './controllers/refund-notify.controller'
 import { WxPayNotifyController } from './controllers/wx-pay-notify.controller'
 import { ReconciliationCronProcessor } from './processors/reconciliation-cron.processor'
+import { AlipayProvider, WechatPayV3Provider } from './providers'
 import { BalanceService } from './services/balance.service'
 import {
   PAYMENT_EVENTS_PUBLISHER,
@@ -131,6 +133,7 @@ const reviewRefundServiceProvider: Provider = {
     PaymentController,
     WxPayNotifyController,
     AlipayNotifyController,
+    PaymentCallbackController,
     RefundNotifyController,
     RefundAdminController,
     ReconciliationAdminController,
@@ -142,6 +145,10 @@ const reviewRefundServiceProvider: Provider = {
     AlipayAdapter,
     BalanceAdapter,
     adapterRegistryProvider,
+
+    /* P9/W3.C — 真实第三方 Provider（envelope 自实现，env 缺失自动降级） */
+    WechatPayV3Provider,
+    AlipayProvider,
 
     /* 6 Services */
     PaymentService,
@@ -167,7 +174,10 @@ const reviewRefundServiceProvider: Provider = {
     ReconciliationService,
     PaymentStateMachine,
     REVIEW_DEP_REFUND_SERVICE,
-    PAYMENT_EVENTS_PUBLISHER
+    PAYMENT_EVENTS_PUBLISHER,
+    /* P9/W3.C — 暴露真实 provider，便于 service 注入（保留 mock 兜底） */
+    WechatPayV3Provider,
+    AlipayProvider
   ]
 })
 export class PaymentModule {}

@@ -34,6 +34,7 @@ describe('SettlementService', () => {
   let recordRepoCreate: jest.Mock
   let matchRulesForOrder: jest.Mock
   let accountServiceEarn: jest.Mock
+  let accountServiceRefund: jest.Mock
 
   const buildRule = (over: Record<string, unknown> = {}) => ({
     id: 'R1',
@@ -53,6 +54,10 @@ describe('SettlementService', () => {
     accountServiceEarn = jest.fn().mockResolvedValue({
       account: { balance: '100.00' },
       flow: { flowNo: 'F0001' }
+    })
+    accountServiceRefund = jest.fn().mockResolvedValue({
+      account: { balance: '90.00' },
+      flow: { flowNo: 'FR0001' }
     })
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -77,7 +82,7 @@ describe('SettlementService', () => {
         },
         {
           provide: AccountService,
-          useValue: { earn: accountServiceEarn }
+          useValue: { earn: accountServiceEarn, refund: accountServiceRefund }
         }
       ]
     }).compile()
@@ -787,6 +792,188 @@ describe('SettlementService', () => {
       const result = await service.computeForOrder(input)
       expect(result.records).toHaveLength(0)
       expect(result.skippedReasons.some((r) => r.includes('rider') && r.includes('≤0'))).toBe(true)
+    })
+  })
+
+  /**
+   * P9 Sprint 3 / W3.B.1：reverseForOrder 反向分账单测
+   * 覆盖 happy / 部分失败 / 全失败 / 空记录 / 非法 amount
+   */
+  describe('reverseForOrder', () => {
+    it('happy: 3 条 EXECUTED 记录全部反向 → reversed=3 failed=0', async () => {
+      const records = [
+        {
+          id: 'SR1',
+          settlementNo: 'S001',
+          targetType: SettlementTargetTypeEnum.MERCHANT,
+          targetId: 'M1',
+          settleAmount: '10.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099001'
+        },
+        {
+          id: 'SR2',
+          settlementNo: 'S002',
+          targetType: SettlementTargetTypeEnum.RIDER,
+          targetId: 'R1',
+          settleAmount: '5.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099001'
+        },
+        {
+          id: 'SR3',
+          settlementNo: 'S003',
+          targetType: SettlementTargetTypeEnum.PLATFORM,
+          targetId: null,
+          settleAmount: '2.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099001'
+        }
+      ]
+      recordRepoFind.mockResolvedValueOnce(records)
+
+      const result = await service.reverseForOrder('T20260419000099001', '17.00')
+      expect(result.reversed).toBe(3)
+      expect(result.failed).toBe(0)
+      expect(accountServiceRefund).toHaveBeenCalledTimes(3)
+      expect(recordRepoSave).toHaveBeenCalledTimes(3)
+      /* 校验每条 record 状态置为 REVERSED */
+      const savedStatuses = recordRepoSave.mock.calls.map(
+        (c) => (c[0] as { status: number }).status
+      )
+      expect(savedStatuses).toEqual([
+        SettlementRecordStatusEnum.REVERSED,
+        SettlementRecordStatusEnum.REVERSED,
+        SettlementRecordStatusEnum.REVERSED
+      ])
+    })
+
+    it('部分失败：第二条 refund 抛错 → reversed=2 failed=1（第三条仍执行）', async () => {
+      const records = [
+        {
+          id: 'SR1',
+          settlementNo: 'S001',
+          targetType: SettlementTargetTypeEnum.MERCHANT,
+          targetId: 'M1',
+          settleAmount: '10.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099002'
+        },
+        {
+          id: 'SR2',
+          settlementNo: 'S002',
+          targetType: SettlementTargetTypeEnum.RIDER,
+          targetId: 'R1',
+          settleAmount: '5.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099002'
+        },
+        {
+          id: 'SR3',
+          settlementNo: 'S003',
+          targetType: SettlementTargetTypeEnum.PLATFORM,
+          targetId: null,
+          settleAmount: '2.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099002'
+        }
+      ]
+      recordRepoFind.mockResolvedValueOnce(records)
+      accountServiceRefund
+        .mockResolvedValueOnce({
+          account: { balance: '90.00' },
+          flow: { flowNo: 'FR1' }
+        })
+        .mockRejectedValueOnce(new Error('balance insufficient'))
+        .mockResolvedValueOnce({
+          account: { balance: '88.00' },
+          flow: { flowNo: 'FR3' }
+        })
+
+      const result = await service.reverseForOrder('T20260419000099002', '17.00')
+      expect(result.reversed).toBe(2)
+      expect(result.failed).toBe(1)
+      expect(accountServiceRefund).toHaveBeenCalledTimes(3)
+    })
+
+    it('全失败：每条 refund 都抛错 → reversed=0 failed=N', async () => {
+      const records = [
+        {
+          id: 'SR1',
+          settlementNo: 'S001',
+          targetType: SettlementTargetTypeEnum.MERCHANT,
+          targetId: 'M1',
+          settleAmount: '10.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099003'
+        },
+        {
+          id: 'SR2',
+          settlementNo: 'S002',
+          targetType: SettlementTargetTypeEnum.RIDER,
+          targetId: 'R1',
+          settleAmount: '5.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099003'
+        }
+      ]
+      recordRepoFind.mockResolvedValueOnce(records)
+      accountServiceRefund.mockRejectedValue(new Error('account locked'))
+
+      const result = await service.reverseForOrder('T20260419000099003', '15.00')
+      expect(result.reversed).toBe(0)
+      expect(result.failed).toBe(2)
+    })
+
+    it('空记录：无 EXECUTED 记录 → reversed=0 failed=0', async () => {
+      recordRepoFind.mockResolvedValueOnce([])
+      const result = await service.reverseForOrder('T20260419000099004', '10.00')
+      expect(result.reversed).toBe(0)
+      expect(result.failed).toBe(0)
+      expect(accountServiceRefund).not.toHaveBeenCalled()
+    })
+
+    it('非法 refundAmount（0）→ 立即返回 reversed=0 failed=0 不查库', async () => {
+      const result = await service.reverseForOrder('T20260419000099005', '0')
+      expect(result.reversed).toBe(0)
+      expect(result.failed).toBe(0)
+      expect(recordRepoFind).not.toHaveBeenCalled()
+    })
+
+    it('非法 refundAmount（NaN）→ 立即返回 reversed=0 failed=0', async () => {
+      const result = await service.reverseForOrder('T20260419000099006', 'not-a-number')
+      expect(result.reversed).toBe(0)
+      expect(result.failed).toBe(0)
+    })
+
+    it('PLATFORM target → 用 PLATFORM_OWNER_ID 调 refund', async () => {
+      const records = [
+        {
+          id: 'SR1',
+          settlementNo: 'S001',
+          targetType: SettlementTargetTypeEnum.PLATFORM,
+          targetId: null,
+          settleAmount: '2.00',
+          status: SettlementRecordStatusEnum.EXECUTED,
+          isDeleted: 0,
+          orderNo: 'T20260419000099007'
+        }
+      ]
+      recordRepoFind.mockResolvedValueOnce(records)
+      const result = await service.reverseForOrder('T20260419000099007', '2.00')
+      expect(result.reversed).toBe(1)
+      expect(accountServiceRefund).toHaveBeenCalledTimes(1)
+      const callArgs = accountServiceRefund.mock.calls[0]
+      /* refund(ownerType, ownerId, amount, bizType, options) */
+      expect(callArgs?.[1]).toBe('0') /* PLATFORM_OWNER_ID */
     })
   })
 })

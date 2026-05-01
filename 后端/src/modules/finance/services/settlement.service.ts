@@ -314,6 +314,121 @@ export class SettlementService {
     }
   }
 
+  /* ==========================================================================
+   * 二·B、reverseForOrder —— 退款成功后反向分账（P9 Sprint 3 / W3.B.1）
+   * ========================================================================== */
+
+  /**
+   * 反向分账：RefundSucceed 事件触发时调用
+   *
+   * 业务语义：
+   *   - 已正向分账（status=EXECUTED）的 settlement_record 必须把对应资金从
+   *     商户 / 骑手 / 平台账户回收，落 OUT 流水（biz_type=REFUND_REVERSE）
+   *   - 反向后该 record 状态置为 REVERSED（已撤销）
+   *
+   * 入参：
+   *   - orderNo       原订单号
+   *   - refundAmount  退款金额（保留参数；当前实现按 record 全额反向，未来可扩展按比例反向）
+   *
+   * 返回值：{ reversed: 成功反向数, failed: 反向失败数 }
+   *
+   * 行为：
+   *   1) 查 status=EXECUTED 的所有 active settlement_record
+   *   2) 逐条：accountService.refund(targetOwner, settle_amount, REFUND_REVERSE) +
+   *      UPDATE settlement_record SET status=REVERSED + 记录反向 flow_no
+   *   3) 部分失败：不抛错，记 logger.error，继续后续；最终汇总 reversed/failed
+   *
+   * 注意：
+   *   - 全程 BigNumber，不使用 number 算金额
+   *   - account.refund 内部走 spend 失败时会抛（balance 不足等），单条失败不影响其他
+   */
+  async reverseForOrder(
+    orderNo: string,
+    refundAmount: string
+  ): Promise<{ reversed: number; failed: number }> {
+    /* refundAmount 当前未按比例切分使用：保留入参以便将来扩展（部分退款 → 部分反向）
+       BigNumber 对完全非数字字符串会抛异常，因此用 try/catch 包裹 */
+    let refundAmtValid = false
+    try {
+      const refundAmt = new BigNumber(refundAmount)
+      refundAmtValid = !refundAmt.isNaN() && refundAmt.isFinite() && refundAmt.gt(0)
+    } catch {
+      refundAmtValid = false
+    }
+    if (!refundAmtValid) {
+      this.logger.warn(
+        `[reverseForOrder] refundAmount 非法 order=${orderNo} amount=${refundAmount}`
+      )
+      return { reversed: 0, failed: 0 }
+    }
+
+    const records = await this.recordRepo.find({
+      where: {
+        orderNo,
+        status: SettlementRecordStatusEnum.EXECUTED,
+        isDeleted: 0
+      }
+    })
+
+    if (records.length === 0) {
+      this.logger.log(`[reverseForOrder] 无需反向 order=${orderNo}（无 EXECUTED 记录）`)
+      return { reversed: 0, failed: 0 }
+    }
+
+    let reversed = 0
+    let failed = 0
+
+    for (const record of records) {
+      try {
+        const ownerInfo = this.resolveOwnerForTarget(record.targetType, record.targetId)
+        if (!ownerInfo) {
+          this.logger.error(
+            `[reverseForOrder] 解析 owner 失败 settlement=${record.settlementNo} target=${record.targetType}/${record.targetId}`
+          )
+          failed += 1
+          continue
+        }
+
+        /* 反向金额：BigNumber 复用 record.settleAmount（已 .toFixed(2)） */
+        const reverseAmount = new BigNumber(record.settleAmount).toFixed(2)
+
+        const opResult = await this.accountService.refund(
+          ownerInfo.ownerType,
+          ownerInfo.ownerId,
+          reverseAmount,
+          FlowBizTypeEnum.REFUND_REVERSE,
+          {
+            relatedNo: record.settlementNo,
+            remark: `订单 ${orderNo} 退款反向分账（target=${record.targetType}）`,
+            opAdminId: null
+          }
+        )
+
+        record.status = SettlementRecordStatusEnum.REVERSED
+        record.errorMsg = `REFUND_REVERSE flow=${opResult.flow.flowNo}`.slice(0, 255)
+        record.updatedAt = new Date()
+        await this.recordRepo.save(record)
+
+        reversed += 1
+        this.logger.log(
+          `[reverseForOrder] OK settlement=${record.settlementNo} order=${orderNo} target=${record.targetType} amount=${reverseAmount} flow=${opResult.flow.flowNo}`
+        )
+      } catch (err) {
+        failed += 1
+        const msg = err instanceof Error ? err.message : String(err)
+        this.logger.error(
+          `[reverseForOrder] FAIL settlement=${record.settlementNo} order=${orderNo} target=${record.targetType} err=${msg}`
+        )
+        /* 失败不阻断后续，继续下一条 */
+      }
+    }
+
+    this.logger.log(
+      `[reverseForOrder] DONE order=${orderNo} total=${records.length} reversed=${reversed} failed=${failed}`
+    )
+    return { reversed, failed }
+  }
+
   /**
    * 单订单"算 + 立即执行"完整闭环（cron + admin run-once 复用）
    *

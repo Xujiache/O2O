@@ -56,6 +56,7 @@ import {
   UserPointAdminController,
   UserPointSelfController
 } from './controllers/user-point.controller'
+import { GroupBuySagaService } from '@/modules/orchestration/services/group-buy-saga.service'
 import { CouponService } from './services/coupon.service'
 import { DiscountCalcService } from './services/discount-calc.service'
 import { GroupBuyService } from './services/group-buy.service'
@@ -105,7 +106,10 @@ import { UserPointService } from './services/user-point.service'
     DiscountCalcService,
     RedPacketService,
     UserPointService,
-    InviteRelationService
+    InviteRelationService,
+    /* P9 Sprint 3 / W3.D.2：拼单成团 → 多单合并 saga（marketing 域注册；
+     * 不动 OrchestrationModule；OrderService / DispatchService 通过 ModuleRef 跨模块查询） */
+    GroupBuySagaService
   ],
   exports: [
     CouponService,

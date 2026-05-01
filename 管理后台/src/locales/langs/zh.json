@@ -461,7 +461,8 @@
         "operationLog": "操作日志",
         "apiLog": "接口日志",
         "systemConfig": "系统配置",
-        "appConfig": "APP 配置"
+        "appConfig": "APP 配置",
+        "dlqMonitor": "DLQ 监控"
       },
       "csRisk": {
         "root": "客服与风控",

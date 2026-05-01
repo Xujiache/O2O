@@ -106,6 +106,9 @@ export { Ticket } from './review/ticket.entity'
 // ===== P9 Sprint 2 / W2.B.2（P9-P1-09）Saga 状态持久化 =====
 export * from './saga-state.entity'
 
+// ===== P9 Sprint 3 / W3.B.2 DLQ 自动重试日志 =====
+export * from './dlq-retry-log.entity'
+
 import { User } from './user.entity'
 import { UserAddress } from './user-address.entity'
 import { Merchant } from './merchant.entity'
@@ -166,6 +169,7 @@ import { Complaint } from './review/complaint.entity'
 import { Arbitration } from './review/arbitration.entity'
 import { Ticket } from './review/ticket.entity'
 import { SagaState } from './saga-state.entity'
+import { DlqRetryLog } from './dlq-retry-log.entity'
 
 /**
  * D1 账号域 14 实体清单（数组形式）
@@ -285,10 +289,11 @@ export const D8_REVIEW_ENTITIES = [
 ] as const
 
 /**
- * 编排域实体（P9 Sprint 2 / W2.B.2 / P9-P1-09）
- * 用途：DatabaseModule 注册；OrchestrationModule 内 TypeOrmModule.forFeature 引入
+ * 编排域实体（P9 Sprint 2 / W2.B.2 / P9-P1-09 + P9 Sprint 3 / W3.B.2）
+ * 用途：DatabaseModule 注册；OrchestrationModule / FinanceModule 内
+ *      TypeOrmModule.forFeature 引入
  */
-export const ORCHESTRATION_ENTITIES = [SagaState] as const
+export const ORCHESTRATION_ENTITIES = [SagaState, DlqRetryLog] as const
 
 /** 全部已落地实体（DatabaseModule 一次注册） */
 export const ALL_ENTITIES = [

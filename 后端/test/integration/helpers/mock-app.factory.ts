@@ -57,6 +57,7 @@ export interface MockSet {
   userCouponRestore: jest.Mock
   dispatchOrder: jest.Mock
   settlementRunForOrder: jest.Mock
+  settlementReverseForOrder: jest.Mock
   inviteCompleteReward: jest.Mock
   refundCreateRefund: jest.Mock
   messageSend: jest.Mock
@@ -97,6 +98,7 @@ export async function createMockApp(): Promise<MockApp> {
     settlementRunForOrder: jest
       .fn()
       .mockResolvedValue({ orderNo: '', created: 3, executed: 3, failed: 0, skipped: 0 }),
+    settlementReverseForOrder: jest.fn().mockResolvedValue({ reversed: 2, failed: 0 }),
     inviteCompleteReward: jest.fn().mockResolvedValue(undefined),
     refundCreateRefund: jest
       .fn()
@@ -148,7 +150,10 @@ export async function createMockApp(): Promise<MockApp> {
       },
       {
         provide: SettlementService,
-        useValue: { runForOrder: mocks.settlementRunForOrder }
+        useValue: {
+          runForOrder: mocks.settlementRunForOrder,
+          reverseForOrder: mocks.settlementReverseForOrder
+        }
       },
       {
         provide: InviteRelationService,

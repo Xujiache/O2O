@@ -31,7 +31,7 @@
  *   - 不订阅 OrderPaid 事件（Sprint 8 编排接入），dispatchOrder 由外部主动调用
  */
 
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common'
+import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
 import { Queue } from 'bullmq'
@@ -43,6 +43,13 @@ import { DispatchRecord } from '@/entities'
 import { REDIS_CLIENT } from '@/health/redis.provider'
 import { MessageService } from '@/modules/message/message.service'
 import { OrderShardingHelper } from '@/modules/order/order-sharding.helper'
+import { SysConfigService } from '@/modules/system/sys-config.service'
+import {
+  DEFAULT_DISPATCH_MAX_ATTEMPTS,
+  DEFAULT_DISPATCH_RESPONSE_TIMEOUT_MS,
+  SYS_KEY_DISPATCH_MAX_ATTEMPTS,
+  SYS_KEY_DISPATCH_RESPONSE_TIMEOUT_MS
+} from '@/modules/system/sys-config.keys'
 import { SnowflakeId } from '@/utils'
 import { type DispatchListQueryDto, type DispatchRecordVo } from '../dto/dispatch.dto'
 import {
@@ -72,11 +79,11 @@ export const CHECK_TIMEOUT_JOB = 'check-timeout'
 const DISPATCH_LOCK_KEY = (orderNo: string): string => `lock:dispatch:${orderNo}`
 const DISPATCH_LOCK_TTL_S = 30
 
-/** 应答超时（毫秒）：DESIGN §5.2 / V4.27 */
-const RESPONSE_TIMEOUT_MS = 15 * 1000
+/** 应答超时（毫秒）默认值：DESIGN §5.2 / V4.27（P9 Sprint 3 起改读 sys_config dispatch.response_timeout_ms） */
+const RESPONSE_TIMEOUT_MS_DEFAULT = DEFAULT_DISPATCH_RESPONSE_TIMEOUT_MS
 
-/** 系统派单最大重试次数：超过进抢单池 */
-const MAX_DISPATCH_ATTEMPTS = 3
+/** 系统派单最大重试次数默认值：超过进抢单池（P9 Sprint 3 起改读 sys_config dispatch.max_attempts） */
+const MAX_DISPATCH_ATTEMPTS_DEFAULT = DEFAULT_DISPATCH_MAX_ATTEMPTS
 
 /** OperationLog op_type：5 系统 / 4 管理员 / 3 骑手 */
 const OP_TYPE_SYSTEM = 5
@@ -114,8 +121,42 @@ export class DispatchService {
     private readonly scoringService: ScoringService,
     private readonly routeMatchService: RouteMatchService,
     private readonly grabService: GrabService,
-    private readonly messageService: MessageService
+    private readonly messageService: MessageService,
+    /**
+     * P9 Sprint 3 / W3.A.1：sys_config 全量接入。
+     *   - dispatch.response_timeout_ms / dispatch.max_attempts 改读 sys_config，缺失时回退默认 15s / 3 次
+     *   - @Optional() 保证旧测试 / mock 模式不阻塞
+     */
+    @Optional() private readonly sysConfigService?: SysConfigService
   ) {}
+
+  /**
+   * 解析应答超时（毫秒）：sys_config dispatch.response_timeout_ms 优先，缺失回退默认 15000
+   */
+  private async resolveResponseTimeoutMs(): Promise<number> {
+    if (!this.sysConfigService) return RESPONSE_TIMEOUT_MS_DEFAULT
+    const v = await this.sysConfigService.get<number>(
+      SYS_KEY_DISPATCH_RESPONSE_TIMEOUT_MS,
+      RESPONSE_TIMEOUT_MS_DEFAULT
+    )
+    return typeof v === 'number' && Number.isFinite(v) && v >= 1000
+      ? v
+      : RESPONSE_TIMEOUT_MS_DEFAULT
+  }
+
+  /**
+   * 解析系统派单最大重试次数：sys_config dispatch.max_attempts 优先，缺失回退默认 3
+   */
+  private async resolveMaxAttempts(): Promise<number> {
+    if (!this.sysConfigService) return MAX_DISPATCH_ATTEMPTS_DEFAULT
+    const v = await this.sysConfigService.get<number>(
+      SYS_KEY_DISPATCH_MAX_ATTEMPTS,
+      MAX_DISPATCH_ATTEMPTS_DEFAULT
+    )
+    return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 10
+      ? v
+      : MAX_DISPATCH_ATTEMPTS_DEFAULT
+  }
 
   /* ============================================================================
    * 派单主入口：dispatchOrder
@@ -182,8 +223,9 @@ export class DispatchService {
         return null
       }
 
-      /* 写 dispatch_record + delay 15s 检查 + 推送 */
-      const expireAt = new Date(Date.now() + RESPONSE_TIMEOUT_MS)
+      /* 写 dispatch_record + delay 15s（或 sys_config 配置值）检查 + 推送 */
+      const responseTimeoutMs = await this.resolveResponseTimeoutMs()
+      const expireAt = new Date(Date.now() + responseTimeoutMs)
       const drId = await this.insertDispatchRecord({
         orderNo,
         orderType,
@@ -193,7 +235,7 @@ export class DispatchService {
         attempt
       })
 
-      await this.scheduleTimeoutJob(drId, orderNo, orderType, attempt)
+      await this.scheduleTimeoutJob(drId, orderNo, orderType, attempt, responseTimeoutMs)
       await this.pushDispatchMessage(top, orderCtx)
 
       const record = await this.dispatchRepo.findOne({ where: { id: drId } })
@@ -243,7 +285,8 @@ export class DispatchService {
     )
 
     const nextAttempt = attempt + 1
-    if (nextAttempt >= MAX_DISPATCH_ATTEMPTS) {
+    const maxAttempts = await this.resolveMaxAttempts()
+    if (nextAttempt >= maxAttempts) {
       const orderCtx = await this.loadOrderContext(orderNo, orderType)
       if (orderCtx) {
         await this.markGrabPool(orderCtx)
@@ -839,14 +882,15 @@ export class DispatchService {
     dispatchRecordId: string,
     orderNo: string,
     orderType: OrderTypeForDispatchValue,
-    attempt: number
+    attempt: number,
+    delayMs?: number
   ): Promise<void> {
     try {
       await this.retryQueue.add(
         CHECK_TIMEOUT_JOB,
         { dispatchRecordId, orderNo, orderType, attempt } satisfies DispatchRetryJob,
         {
-          delay: RESPONSE_TIMEOUT_MS,
+          delay: delayMs ?? RESPONSE_TIMEOUT_MS_DEFAULT,
           jobId: `dr-${dispatchRecordId}`,
           removeOnComplete: { age: 3600 },
           removeOnFail: { age: 86400 }

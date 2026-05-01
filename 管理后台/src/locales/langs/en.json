@@ -461,7 +461,8 @@
         "operationLog": "Operation Log",
         "apiLog": "API Log",
         "systemConfig": "System Config",
-        "appConfig": "APP Config"
+        "appConfig": "APP Config",
+        "dlqMonitor": "DLQ Monitor"
       },
       "csRisk": {
         "root": "CS & Risk",

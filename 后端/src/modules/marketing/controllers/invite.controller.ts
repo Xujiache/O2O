@@ -46,7 +46,7 @@ export class InvitePublicController {
     summary: '公开 - 邀请页（解析 inviteCode 取 inviter_id；昵称/头像本期返回 mask 占位）'
   })
   @ApiSwaggerResponse({ status: 200, type: InvitePageVo })
-  getInvitePage(@Param('inviteCode') inviteCode: string): InvitePageVo {
+  async getInvitePage(@Param('inviteCode') inviteCode: string): Promise<InvitePageVo> {
     return this.inviteService.getInvitePage(inviteCode)
   }
 }
