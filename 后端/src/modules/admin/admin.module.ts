@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import {
   Admin,
   AdminRole,
+  ApiLog,
   Arbitration,
   Complaint,
   DlqRetryLog,
@@ -31,6 +32,7 @@ import { AdminExportProcessor } from './processors/admin-export.processor'
 import { AdminFinanceExtService } from './services/admin-finance-ext.service'
 import { AdminRiderExtService } from './services/admin-rider-ext.service'
 import { AdminDashboardService } from './services/admin-dashboard.service'
+import { LogQueryService } from './services/log-query.service'
 import {
   DlqRetryProcessor,
   ORCHESTRATION_DLQ_RETRY_QUEUE
@@ -67,7 +69,9 @@ import { ReviewModule } from '@/modules/review/review.module'
       Complaint,
       DlqRetryLog,
       /* P9 Sprint 4 / W4.B.2：admin-finance-ext.service retrySettlement 需 SettlementRecord Repository */
-      SettlementRecord
+      SettlementRecord,
+      /* P9 Sprint 5 / W5.A.3：LogQueryService 查 api_log 真后端 */
+      ApiLog
     ]),
     BullModule.registerQueue({ name: ORCHESTRATION_DLQ_RETRY_QUEUE }),
     /* P9 Sprint 4 / W4.B.1：admin-export 独立队列，concurrency=2 */
@@ -99,6 +103,8 @@ import { ReviewModule } from '@/modules/review/review.module'
     AdminFinanceExtService,
     AdminRiderExtService,
     AdminDashboardService,
+    /* P9 Sprint 5 / W5.A.3：操作日志 / API 日志真后端查询 */
+    LogQueryService,
     { provide: APP_INTERCEPTOR, useClass: OperationLogInterceptor }
   ],
   exports: [OperationLogService]

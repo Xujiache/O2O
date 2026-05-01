@@ -16,12 +16,26 @@ import {
   RolePermission
 } from '@/entities'
 import { SnowflakeId } from '@/utils'
+import { LogQueryService } from '../services/log-query.service'
 
 class ListQueryDto {
   page?: number
   pageSize?: number
   keyword?: string
   type?: string
+  /** P9 Sprint 5 / W5.A.3：日志查询扩展字段（操作日志） */
+  opAdminId?: string
+  module?: string
+  action?: string
+  startAt?: string
+  endAt?: string
+  /** API 日志专用 */
+  traceId?: string
+  callerType?: number
+  callerId?: string
+  method?: string
+  statusCode?: number
+  errorOnly?: boolean
 }
 
 @ApiTags('管理后台 - 系统管理')
@@ -44,7 +58,9 @@ export class AdminSystemController {
     @InjectRepository(OperationLog)
     private readonly operationLogRepo: Repository<OperationLog>,
     private readonly adminService: AdminService,
-    private readonly sysConfigService: SysConfigService
+    private readonly sysConfigService: SysConfigService,
+    /** P9 Sprint 5 / W5.A.3：操作日志 / API 日志真后端查询 */
+    private readonly logQueryService: LogQueryService
   ) {}
 
   @Get('admin/list')
@@ -304,21 +320,19 @@ export class AdminSystemController {
   }
 
   @Get('operation-log/list')
-  @ApiOperation({ summary: '操作日志列表' })
+  @ApiOperation({ summary: '操作日志列表（P9 Sprint 5：真后端 LogQueryService）' })
   async operationLogList(@Query() query: ListQueryDto) {
-    const page = Number(query.page) || 1
-    const pageSize = Number(query.pageSize) || 20
-    const qb = this.operationLogRepo.createQueryBuilder('l').where('l.is_deleted = 0')
-    if (query.keyword) {
-      qb.andWhere('(l.op_admin_name LIKE :k OR l.description LIKE :k OR l.resource_id LIKE :k)', {
-        k: `%${query.keyword}%`
-      })
-    }
-    qb.orderBy('l.created_at', 'DESC')
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-    const [rows, total] = await qb.getManyAndCount()
-    return this.toBizPage(makePageResult(rows, total, page, pageSize), (item) => ({
+    const result = await this.logQueryService.queryOperationLogs({
+      page: query.page,
+      pageSize: query.pageSize,
+      keyword: query.keyword,
+      opAdminId: query.opAdminId,
+      module: query.module,
+      action: query.action,
+      startAt: query.startAt,
+      endAt: query.endAt
+    })
+    return this.toBizPage(result, (item) => ({
       id: item.id,
       traceId: null,
       adminUsername: item.opAdminName ?? '',
@@ -336,16 +350,34 @@ export class AdminSystemController {
   }
 
   @Get('api-log/list')
-  @ApiOperation({ summary: 'API日志列表（占位）' })
+  @ApiOperation({ summary: 'API 日志列表（P9 Sprint 5：真后端 LogQueryService）' })
   async apiLogList(@Query() query: ListQueryDto) {
-    const page = Number(query.page) || 1
-    const pageSize = Number(query.pageSize) || 20
-    return {
-      records: [],
-      total: 0,
-      page,
-      pageSize
-    }
+    const result = await this.logQueryService.queryApiLogs({
+      page: query.page,
+      pageSize: query.pageSize,
+      keyword: query.keyword,
+      traceId: query.traceId,
+      callerType: query.callerType,
+      callerId: query.callerId,
+      method: query.method,
+      statusCode: query.statusCode,
+      errorOnly: query.errorOnly,
+      startAt: query.startAt,
+      endAt: query.endAt
+    })
+    return this.toBizPage(result, (item) => ({
+      id: item.id,
+      traceId: item.traceId,
+      callerType: item.callerType,
+      callerId: item.callerId,
+      method: item.method,
+      path: item.path,
+      statusCode: item.statusCode,
+      costMs: item.costMs,
+      errorCode: item.errorCode,
+      errorMsg: item.errorMsg,
+      createdAt: item.createdAt
+    }))
   }
 
   @Get('system-config')

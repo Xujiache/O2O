@@ -36,6 +36,8 @@ export { Blacklist } from './blacklist.entity'
 export { FileMeta } from './system/file-meta.entity'
 // 员工 B 增量：操作日志（admin/blacklist 服务依赖）
 export { OperationLog } from './system/operation-log.entity'
+// P9 Sprint 5 / W5.A.3：接口请求日志（LogQueryService 依赖）
+export { ApiLog } from './system/api-log.entity'
 
 // ===== D9 消息域 4 张表（员工 B / T3.13 增量） =====
 export { MessageTemplate } from './message/message-template.entity'
@@ -109,6 +111,9 @@ export * from './saga-state.entity'
 // ===== P9 Sprint 3 / W3.B.2 DLQ 自动重试日志 =====
 export * from './dlq-retry-log.entity'
 
+// ===== P9 Sprint 5 / W5.E.3 推送 token 注册 =====
+export * from './push-token.entity'
+
 import { User } from './user.entity'
 import { UserAddress } from './user-address.entity'
 import { Merchant } from './merchant.entity'
@@ -170,6 +175,7 @@ import { Arbitration } from './review/arbitration.entity'
 import { Ticket } from './review/ticket.entity'
 import { SagaState } from './saga-state.entity'
 import { DlqRetryLog } from './dlq-retry-log.entity'
+import { PushToken } from './push-token.entity'
 
 /**
  * D1 账号域 14 实体清单（数组形式）
@@ -295,6 +301,12 @@ export const D8_REVIEW_ENTITIES = [
  */
 export const ORCHESTRATION_ENTITIES = [SagaState, DlqRetryLog] as const
 
+/**
+ * 通知/推送实体（P9 Sprint 5 / W5.E.3）
+ * 用途：NotificationModule TypeOrmModule.forFeature
+ */
+export const NOTIFICATION_ENTITIES = [PushToken] as const
+
 /** 全部已落地实体（DatabaseModule 一次注册） */
 export const ALL_ENTITIES = [
   ...D1_ENTITIES,
@@ -307,5 +319,6 @@ export const ALL_ENTITIES = [
   ...D5_FINANCE_ENTITIES,
   ...D6_DISPATCH_ENTITIES,
   ...D8_REVIEW_ENTITIES,
-  ...ORCHESTRATION_ENTITIES
+  ...ORCHESTRATION_ENTITIES,
+  ...NOTIFICATION_ENTITIES
 ] as const

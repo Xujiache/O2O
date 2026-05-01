@@ -196,11 +196,23 @@ export class AdminLoginDto {
   @Length(2, 64)
   username!: string
 
-  @ApiProperty({ description: '密码', example: 'Pwd@2026' })
+  @ApiPropertyOptional({
+    description: '密码明文（兼容旧前端；推荐使用 passwordCipher）',
+    example: 'Pwd@2026'
+  })
+  @IsOptional()
   @IsString()
   @MinLength(6)
   @MaxLength(64)
-  password!: string
+  password?: string
+
+  @ApiPropertyOptional({
+    description: '【W5.C.1】RSA-OAEP/SHA-256 加密后的 base64 密文；与 password 二选一（推荐）',
+    example: 'base64-cipher...'
+  })
+  @IsOptional()
+  @IsString()
+  passwordCipher?: string
 
   @ApiPropertyOptional({ description: '图形验证码（本期未强制；P9 启用）' })
   @IsOptional()

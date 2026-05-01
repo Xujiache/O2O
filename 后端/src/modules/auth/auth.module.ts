@@ -39,10 +39,12 @@ import {
 import { HealthModule } from '../../health/health.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { AdminPubkeyController } from './controllers/admin-pubkey.controller'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { PermissionGuard } from './guards/permission.guard'
 import { ThrottleSignGuard } from './guards/throttle-sign.guard'
 import { UserTypeGuard } from './guards/user-type.guard'
+import { RsaKeyService } from './services/rsa-key.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { WxMpStrategy } from './strategies/wx-mp.strategy'
 
@@ -74,7 +76,7 @@ import { WxMpStrategy } from './strategies/wx-mp.strategy'
       Blacklist
     ])
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, AdminPubkeyController],
   providers: [
     AuthService,
     JwtStrategy,
@@ -82,8 +84,16 @@ import { WxMpStrategy } from './strategies/wx-mp.strategy'
     JwtAuthGuard,
     UserTypeGuard,
     PermissionGuard,
-    ThrottleSignGuard
+    ThrottleSignGuard,
+    RsaKeyService
   ],
-  exports: [AuthService, JwtAuthGuard, UserTypeGuard, PermissionGuard, ThrottleSignGuard]
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    UserTypeGuard,
+    PermissionGuard,
+    ThrottleSignGuard,
+    RsaKeyService
+  ]
 })
 export class AuthModule {}

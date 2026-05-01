@@ -55,6 +55,9 @@ export default ({ mode }: { mode: string }) => {
     build: {
       target: 'es2015',
       outDir: 'dist',
+      // P9 Sprint 5 W5.D.1：开启 sourcemap，供 Sentry releases 上传与堆栈还原
+      // CI 阶段 upload-sourcemap.sh 上传完毕后会清理 .map 文件，避免对外暴露
+      sourcemap: true,
       chunkSizeWarningLimit: 2000,
       minify: 'terser',
       terserOptions: {

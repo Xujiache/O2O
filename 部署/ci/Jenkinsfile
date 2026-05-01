@@ -160,16 +160,31 @@ pipeline {
             }
         }
 
-        // P9 Sprint 2 / W2.E.3：仅 main 分支上传 sourcemap（脚本由 Agent C 提供 / 缺脚本自动跳过）
+        // P9 Sprint 5 / W5.D.3：sourcemap 上传 4 端 + 删除 .map（缺 SENTRY_AUTH_TOKEN 时跳过）
         stage('Upload Sourcemap') {
             when {
-                allOf {
-                    branch 'main'
-                    expression { return fileExists('部署/ci/scripts/upload-sourcemap.sh') }
-                }
+                expression { return env.SENTRY_AUTH_TOKEN != null }
             }
             steps {
-                sh 'bash 部署/ci/scripts/upload-sourcemap.sh'
+                sh 'bash 部署/ci/scripts/upload-sourcemap.sh ./管理后台/dist ${BUILD_NUMBER}'
+                sh 'bash 部署/ci/scripts/upload-sourcemap.sh ./用户端/dist ${BUILD_NUMBER}'
+                sh 'bash 部署/ci/scripts/upload-sourcemap.sh ./商户端/dist ${BUILD_NUMBER}'
+                sh 'bash 部署/ci/scripts/upload-sourcemap.sh ./骑手端/dist ${BUILD_NUMBER}'
+            }
+        }
+
+        // P9 Sprint 5 / W5.D.3：Lighthouse 性能门禁（缺 LIGHTHOUSE_URL 时跳过）
+        stage('Lighthouse') {
+            when {
+                expression { return env.LIGHTHOUSE_URL != null }
+            }
+            steps {
+                sh 'bash 部署/ci/scripts/lighthouse.sh ${LIGHTHOUSE_URL} ./lighthouse-ci.json'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'lighthouse-ci.json', allowEmptyArchive: true
+                }
             }
         }
 

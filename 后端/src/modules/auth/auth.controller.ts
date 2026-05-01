@@ -129,7 +129,7 @@ export class AuthController {
   @ApiBody({ type: AdminLoginDto })
   @ApiResponse({ status: 200, type: AdminLoginResponseVo })
   async adminLogin(@Body() dto: AdminLoginDto): Promise<AdminLoginResponseVo> {
-    return this.authService.adminLogin(dto.username, dto.password, dto.captcha)
+    return this.authService.adminLogin(dto.username, dto.password, dto.captcha, dto.passwordCipher)
   }
 
   /**

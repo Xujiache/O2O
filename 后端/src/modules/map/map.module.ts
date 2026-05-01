@@ -5,6 +5,7 @@ import { RiderLocationConsumer } from './consumer/rider-location.consumer'
 import { MapController } from './map.controller'
 import { MapService } from './map.service'
 import { AmapProvider } from './providers/amap.provider'
+import { AmapServerProvider } from './providers/amap-server.provider'
 import { RiderLocationService } from './rider-location.service'
 import {
   AmqpRiderLocationPublisher,
@@ -54,12 +55,13 @@ const riderLocationPublisherProvider: FactoryProvider<RiderLocationPublisher> = 
   controllers: [MapController],
   providers: [
     AmapProvider,
+    AmapServerProvider,
     MapService,
     RiderLocationService,
     riderLocationPublisherProvider,
     timescalePoolProvider,
     RiderLocationConsumer
   ],
-  exports: [MapService, RiderLocationService, RIDER_LOCATION_PUBLISHER]
+  exports: [MapService, AmapServerProvider, RiderLocationService, RIDER_LOCATION_PUBLISHER]
 })
 export class MapModule {}

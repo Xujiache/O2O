@@ -42,7 +42,36 @@
  */
 
 import { App, Directive } from 'vue'
-import hljs from 'highlight.js'
+/**
+ * P9 Sprint 5 / W5.A.1：highlight.js core + 按需注册 10 种语言
+ *   - 不再 `import hljs from 'highlight.js'` 全量（963 KB）
+ *   - 改为 core + 10 种主流语言 → vendor-highlight-async chunk 显著缩小
+ *   - 富文本面板若需扩展更多语言，只需在下方注册数组追加
+ */
+import hljs from 'highlight.js/lib/core'
+import javascript from 'highlight.js/lib/languages/javascript'
+import typescript from 'highlight.js/lib/languages/typescript'
+import xml from 'highlight.js/lib/languages/xml' /* HTML */
+import css from 'highlight.js/lib/languages/css'
+import json from 'highlight.js/lib/languages/json'
+import java from 'highlight.js/lib/languages/java'
+import python from 'highlight.js/lib/languages/python'
+import go from 'highlight.js/lib/languages/go'
+import bash from 'highlight.js/lib/languages/bash'
+import sql from 'highlight.js/lib/languages/sql'
+
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('typescript', typescript)
+hljs.registerLanguage('html', xml)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('css', css)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('java', java)
+hljs.registerLanguage('python', python)
+hljs.registerLanguage('go', go)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('shell', bash)
+hljs.registerLanguage('sql', sql)
 
 // 高亮代码
 function highlightCode(block: HTMLElement) {

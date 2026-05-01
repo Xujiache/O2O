@@ -76,6 +76,8 @@
   import { useI18n } from 'vue-i18n'
   import { HttpError } from '@/utils/http/error'
   import { fetchLogin } from '@/api/auth'
+  import request from '@/utils/http'
+  import { encryptRsa, getCachedPubkey, setCachedPubkey } from '@/utils/business/rsa'
   import { ElNotification, type FormInstance, type FormRules } from 'element-plus'
 
   defineOptions({ name: 'Login' })
@@ -108,6 +110,23 @@
 
   const loading = ref(false)
 
+  /**
+   * 拉取后端 RSA 公钥（带 sessionStorage 缓存）
+   * 用途：登录提交前用公钥加密 password；缓存命中直接复用
+   */
+  const fetchAdminPubkey = async (): Promise<string> => {
+    const cached = getCachedPubkey()
+    if (cached) return cached
+    const resp = await request.get<Api.Auth.PubkeyResponse>({
+      url: '/api/v1/admin/pubkey'
+    })
+    if (!resp?.pubkey) {
+      throw new Error('[Login] /admin/pubkey 未返回公钥')
+    }
+    setCachedPubkey(resp.pubkey, resp.ttl ?? 86400)
+    return resp.pubkey
+  }
+
   // 登录
   const handleSubmit = async () => {
     if (!formRef.value) return
@@ -119,12 +138,14 @@
 
       loading.value = true
 
-      // 登录请求
+      // 登录请求：W5.C.1 RSA-OAEP/SHA-256 加密 password → passwordCipher
       const { username, password } = formData
+      const pubkey = await fetchAdminPubkey()
+      const passwordCipher = await encryptRsa(pubkey, password)
 
       const { token, refreshToken } = await fetchLogin({
         userName: username,
-        password
+        passwordCipher
       })
 
       // 验证token

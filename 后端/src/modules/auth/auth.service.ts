@@ -50,6 +50,7 @@ import type { AuthUser } from './decorators/current-user.decorator'
 import type { JwtPayload } from './strategies/jwt.strategy'
 import { TOKEN_VER_KEY } from './strategies/jwt.strategy'
 import { PERM_CACHE_KEY, PERM_CACHE_TTL_SECONDS, PERM_WILDCARD } from './guards/permission.guard'
+import { RsaKeyService } from './services/rsa-key.service'
 
 /* ===== Redis Key 模板 ===== */
 const TOKEN_KEY = (userType: string, uid: string): string => `auth:token:${userType}:${uid}`
@@ -106,7 +107,8 @@ export class AuthService {
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepo: Repository<RolePermission>,
     @InjectRepository(Permission) private readonly permissionRepo: Repository<Permission>,
-    @InjectRepository(Blacklist) private readonly blacklistRepo: Repository<Blacklist>
+    @InjectRepository(Blacklist) private readonly blacklistRepo: Repository<Blacklist>,
+    private readonly rsaKeyService: RsaKeyService
   ) {}
 
   /* =========================================================================
@@ -677,16 +679,23 @@ export class AuthService {
    */
   async adminLogin(
     username: string,
-    password: string,
-    _captcha?: string
+    password: string | undefined,
+    _captcha?: string,
+    passwordCipher?: string
   ): Promise<{
     tokens: TokenPair
     admin: AdminLoginVo
     menus: MenuNode[]
     permissions: string[]
   }> {
-    if (!username || !password) {
-      throw new BusinessException(BizErrorCode.PARAM_INVALID, '账号/密码不可为空')
+    if (!username) {
+      throw new BusinessException(BizErrorCode.PARAM_INVALID, '账号不可为空')
+    }
+    /* W5.C.1：登录入口先 RSA 解密 passwordCipher（前端默认链路）；
+       兼容老链路：未传 passwordCipher 时回退用明文 password。 */
+    const plain = passwordCipher ? await this.rsaKeyService.decrypt(passwordCipher) : password
+    if (!plain) {
+      throw new BusinessException(BizErrorCode.PARAM_INVALID, 'password 必填')
     }
 
     /* 用 username（小写）做 hash 用作 lockKey；与手机号风控共用一套 K04 */
@@ -698,7 +707,7 @@ export class AuthService {
       await this.markLoginFail(lockKey)
       throw new BusinessException(BizErrorCode.AUTH_PASSWORD_INCORRECT)
     }
-    if (!PasswordUtil.verify(password, a.passwordHash)) {
+    if (!PasswordUtil.verify(plain, a.passwordHash)) {
       await this.markLoginFail(lockKey)
       throw new BusinessException(BizErrorCode.AUTH_PASSWORD_INCORRECT)
     }

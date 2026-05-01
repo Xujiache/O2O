@@ -62,10 +62,17 @@ declare namespace Api {
 
   /** 认证类型 */
   namespace Auth {
-    /** 登录参数 */
+    /** 登录参数（W5.C.1：password 与 passwordCipher 二选一，推荐 passwordCipher） */
     interface LoginParams {
       userName: string
-      password: string
+      password?: string
+      passwordCipher?: string
+    }
+
+    /** RSA 公钥下发响应（GET /admin/pubkey） */
+    interface PubkeyResponse {
+      pubkey: string
+      ttl: number
     }
 
     /** 登录响应 */

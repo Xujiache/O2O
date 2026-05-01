@@ -22,6 +22,13 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       __APP_ENV__: JSON.stringify(env.VITE_APP_ENV ?? mode)
+    },
+    /**
+     * P9 Sprint 5 W5.D.1：开启 sourcemap，供 Sentry releases 上传与堆栈还原
+     * CI 阶段 upload-sourcemap.sh 上传完毕后会清理 .map 文件，避免对外暴露
+     */
+    build: {
+      sourcemap: true
     }
   }
 })

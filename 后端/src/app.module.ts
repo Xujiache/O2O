@@ -36,6 +36,8 @@ import { CustomerModule } from './modules/customer/customer.module'
 import { SysConfigModule } from './modules/system/sys-config.module'
 /* P9/W2.C.1：Sentry 全局上报模块（紧跟 ConfigModule 注册，确保 ConfigService ready） */
 import { SentryModule } from './modules/sentry/sentry.module'
+/* P9 Sprint 5：通知统一模块（jpush / sms / wx-subscribe / axn + push token 注册） */
+import { NotificationModule } from './modules/notification/notification.module'
 
 /**
  * 根模块
@@ -80,7 +82,9 @@ import { SentryModule } from './modules/sentry/sentry.module'
     AdminModule,
     StatsModule,
     CustomerModule,
-    SysConfigModule
+    SysConfigModule,
+    /* P9 Sprint 5 / W5：通知 + 推送 token */
+    NotificationModule
   ],
   providers: [
     /* 全局 JWT 鉴权守卫：默认拦截所有路由，@Public() 装饰的除外 */

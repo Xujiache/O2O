@@ -26,8 +26,12 @@ export default defineConfig(({ mode }) => {
     /**
      * 屏蔽 pinia 在生产构建时对 @vue/devtools-api / @vue/devtools-kit 的硬依赖（dev-only）
      * 否则 rollup 报 "failed to resolve import" 终止构建
+     *
+     * P9 Sprint 5 W5.D.1：开启 sourcemap，供 Sentry releases 上传与堆栈还原
+     * CI 阶段 upload-sourcemap.sh 上传完毕后会清理 .map 文件，避免对外暴露
      */
     build: {
+      sourcemap: true,
       rollupOptions: {
         external: ['@vue/devtools-api', '@vue/devtools-kit']
       }
