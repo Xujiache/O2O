@@ -22,12 +22,14 @@
  *   - 30s Redis Cache 兜底；DB 异常时退回默认值并打 warn
  */
 
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { InjectDataSource } from '@nestjs/typeorm'
 import BigNumber from 'bignumber.js'
 import type Redis from 'ioredis'
 import { DataSource } from 'typeorm'
 import { REDIS_CLIENT } from '@/health/redis.provider'
+import { SysConfigService } from '@/modules/system/sys-config.service'
+import { SYS_KEY_SCORING } from '@/modules/system/sys-config.keys'
 import {
   DEFAULT_SCORING_WEIGHTS,
   DispatchStatusEnum,
@@ -65,7 +67,13 @@ export class ScoringService {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @InjectDataSource() private readonly dataSource: DataSource,
-    private readonly routeMatchService: RouteMatchService
+    private readonly routeMatchService: RouteMatchService,
+    /**
+     * P9 Sprint 4 / W4.A.1：sys_config 统一接入。
+     *   - SysConfigService 注入后 loadWeights 优先走 sys_config 缓存（5min TTL），不可用时回退原 30s 直查 DB 路径
+     *   - @Optional() 保证旧测试 / mock 模式兼容
+     */
+    @Optional() private readonly sysConfigService?: SysConfigService
   ) {}
 
   /* ============================================================================
@@ -115,12 +123,32 @@ export class ScoringService {
 
   /**
    * 读取评分权重
-   *   1) Redis 30s 缓存命中即返回
-   *   2) miss → 查 sys_config（config_key=dispatch.scoring）
-   *   3) 解析 JSON → 兜底校验字段 → 写回缓存
-   *   4) 任一步异常 → 返回默认权重 + 打 warn
+   *
+   * 优先级：
+   *   1) sys_config（SysConfigService.get → 5min Redis 缓存 + DB 兜底）
+   *   2) 缺 SysConfigService（旧测试 / mock 模式）→ 回退本地 30s 缓存 + DB 直查
+   *   3) 任一步异常 → 返回默认权重 + 打 warn
    */
   async loadWeights(): Promise<ScoringWeights> {
+    if (this.sysConfigService) {
+      try {
+        const cfg = await this.sysConfigService.get<Partial<ScoringWeights> | string | null>(
+          SYS_KEY_SCORING,
+          null
+        )
+        if (cfg) {
+          return this.parseWeightsObj(cfg)
+        }
+      } catch (err) {
+        this.logger.warn(
+          `[SysConfigService] 读 ${SYS_KEY_SCORING} 失败，回退本地 cache 路径：` +
+            (err instanceof Error ? err.message : String(err))
+        )
+      }
+      return DEFAULT_SCORING_WEIGHTS
+    }
+
+    /* fallback：旧 30s 本地缓存路径（保证 spec 兼容） */
     const cached = await this.safeGetWeights(WEIGHTS_CACHE_KEY)
     if (cached) return cached
 
@@ -142,6 +170,19 @@ export class ScoringService {
     }
     await this.safeSetWeights(WEIGHTS_CACHE_KEY, weights, WEIGHTS_CACHE_TTL_S)
     return weights
+  }
+
+  /**
+   * 将 SysConfigService 返回值（已 JSON 反序列化的 object 或字符串）规整为 ScoringWeights
+   */
+  private parseWeightsObj(raw: Partial<ScoringWeights> | string): ScoringWeights {
+    if (typeof raw === 'string') return this.parseWeights(raw)
+    return {
+      distance: this.normalizeWeight(raw.distance, DEFAULT_SCORING_WEIGHTS.distance),
+      capacity: this.normalizeWeight(raw.capacity, DEFAULT_SCORING_WEIGHTS.capacity),
+      routeMatch: this.normalizeWeight(raw.routeMatch, DEFAULT_SCORING_WEIGHTS.routeMatch),
+      rating: this.normalizeWeight(raw.rating, DEFAULT_SCORING_WEIGHTS.rating)
+    }
   }
 
   /**

@@ -14,6 +14,7 @@ import {
   RolePermission,
   Ticket
 } from '@/entities'
+import { SettlementRecord } from '@/entities/finance/settlement-record.entity'
 import { AdminContentController } from './controllers/admin-content.controller'
 import { AdminDashboardController } from './controllers/admin-dashboard.controller'
 import { AdminDlqController } from './controllers/admin-dlq.controller'
@@ -25,10 +26,18 @@ import { AdminRiskController } from './controllers/admin-risk.controller'
 import { AdminSystemController } from './controllers/admin-system.controller'
 import { OperationLogInterceptor } from './operation-log.interceptor'
 import { OperationLogService } from './services/operation-log.service'
+import { ADMIN_EXPORT_QUEUE, AdminExportService } from './services/admin-export.service'
+import { AdminExportProcessor } from './processors/admin-export.processor'
+import { AdminFinanceExtService } from './services/admin-finance-ext.service'
+import { AdminRiderExtService } from './services/admin-rider-ext.service'
+import { AdminDashboardService } from './services/admin-dashboard.service'
 import {
   DlqRetryProcessor,
   ORCHESTRATION_DLQ_RETRY_QUEUE
 } from '@/modules/orchestration/processors/dlq-retry.processor'
+import { FinanceModule } from '@/modules/finance/finance.module'
+import { FileModule } from '@/modules/file/file.module'
+import { MapModule } from '@/modules/map/map.module'
 import { UserModule } from '@/modules/user/user.module'
 import { ReviewModule } from '@/modules/review/review.module'
 
@@ -56,9 +65,17 @@ import { ReviewModule } from '@/modules/review/review.module'
       Ticket,
       Arbitration,
       Complaint,
-      DlqRetryLog
+      DlqRetryLog,
+      /* P9 Sprint 4 / W4.B.2：admin-finance-ext.service retrySettlement 需 SettlementRecord Repository */
+      SettlementRecord
     ]),
     BullModule.registerQueue({ name: ORCHESTRATION_DLQ_RETRY_QUEUE }),
+    /* P9 Sprint 4 / W4.B.1：admin-export 独立队列，concurrency=2 */
+    BullModule.registerQueue({ name: ADMIN_EXPORT_QUEUE }),
+    /* P9 Sprint 4 集成依赖 */
+    FinanceModule /* SettlementService（admin-finance-ext.service） */,
+    FileModule /* STORAGE_ADAPTER（admin-export.processor xlsx 上传 MinIO） */,
+    MapModule /* MapService.queryTrack（admin-rider-ext.service track 端点） */,
     UserModule,
     ReviewModule
   ],
@@ -76,6 +93,12 @@ import { ReviewModule } from '@/modules/review/review.module'
   providers: [
     OperationLogService,
     DlqRetryProcessor,
+    /* P9 Sprint 4 业务 service + BullMQ Worker */
+    AdminExportService,
+    AdminExportProcessor,
+    AdminFinanceExtService,
+    AdminRiderExtService,
+    AdminDashboardService,
     { provide: APP_INTERCEPTOR, useClass: OperationLogInterceptor }
   ],
   exports: [OperationLogService]

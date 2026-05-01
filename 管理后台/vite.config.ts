@@ -16,8 +16,9 @@ export default ({ mode }: { mode: string }) => {
   const env = loadEnv(mode, root)
   const { VITE_VERSION, VITE_PORT, VITE_BASE_URL, VITE_API_URL, VITE_API_PROXY_URL } = env
 
-  console.log(`🚀 API_URL = ${VITE_API_URL}`)
-  console.log(`🚀 VERSION = ${VITE_VERSION}`)
+  // P9 Sprint 4 W4.D.5：用 console.info 输出构建期 banner，避免在 vite.config.ts 残留 console.log
+  console.info(`API_URL = ${VITE_API_URL}`)
+  console.info(`VERSION = ${VITE_VERSION}`)
 
   return defineConfig({
     define: {
@@ -84,8 +85,10 @@ export default ({ mode }: { mode: string }) => {
             if (id.includes('xlsx')) return 'vendor-xlsx'
             // 视频播放
             if (id.includes('xgplayer')) return 'vendor-xgplayer'
-            // 代码高亮
-            if (id.includes('highlight.js')) return 'vendor-highlight'
+            // 代码高亮（异步 chunk：仅 wangEditor 在 onMounted 里 await import 时按需加载，
+            // 不参与首屏 preload；与 vendor-wangeditor 拆分以减小首屏 bundle）
+            // P9 Sprint 4 W4.D.4 优化
+            if (id.includes('highlight.js')) return 'vendor-highlight-async'
             // Element Plus 全家桶（含 icons / dayjs / @ctrl/tinycolor）
             if (
               id.includes('element-plus') ||

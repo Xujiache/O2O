@@ -1,86 +1,194 @@
 # ============================================================================
-# Prometheus 告警规则
+# Prometheus 告警规则（P9 Sprint 4 W4.D.1 细化）
+#   - 业务 SLO（5min 窗口）：订单 / 支付 / 派单 / 退款失败率 + DLQ 堆积 + 健康
+#   - 基础设施：MySQL / Redis / CPU / Disk
+#   - 应用：HTTP 5xx 比率 / P95 延迟
+# 每条 alert 必填 labels(severity/team) + annotations(summary/description/runbook_url)
+# severity 值约定：P0（短信+电话+IM）/ P1（IM）/ P2（邮件）
 # ============================================================================
 groups:
-  # ── 应用层告警 ──
-  - name: o2o-app
+  # ─────────────────────────── 业务 SLO ───────────────────────────
+  - name: o2o-business-slo
+    interval: 30s
     rules:
-      - alert: HighErrorRate
-        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.01
+      - alert: HighOrderCreateFailRate
+        expr: |
+          sum(rate(order_create_fail_total[5m]))
+            /
+          clamp_min(sum(rate(order_create_total[5m])), 1)
+          > 0.05
+        for: 5m
+        labels:
+          severity: P1
+          team: order
+        annotations:
+          summary: '订单创建失败率超过 5%'
+          description: '过去 5 分钟订单创建失败率 {{ $value | humanizePercentage }}，已超过 SLO 阈值 5%。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HighOrderCreateFailRate'
+
+      - alert: HighPaymentFailRate
+        expr: |
+          sum(rate(payment_fail_total[5m]))
+            /
+          clamp_min(sum(rate(payment_total[5m])), 1)
+          > 0.03
+        for: 5m
+        labels:
+          severity: P0
+          team: payment
+        annotations:
+          summary: '支付失败率超过 3%'
+          description: '过去 5 分钟支付失败率 {{ $value | humanizePercentage }}，已超过 SLO 阈值 3%，需立即介入排查。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HighPaymentFailRate'
+
+      - alert: HighDispatchFailRate
+        expr: |
+          sum(rate(dispatch_fail_total[5m]))
+            /
+          clamp_min(sum(rate(dispatch_total[5m])), 1)
+          > 0.10
+        for: 5m
+        labels:
+          severity: P1
+          team: dispatch
+        annotations:
+          summary: '派单失败率超过 10%'
+          description: '过去 5 分钟派单失败率 {{ $value | humanizePercentage }}，已超过 SLO 阈值 10%。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HighDispatchFailRate'
+
+      - alert: HighRefundFailRate
+        expr: |
+          sum(rate(refund_fail_total[5m]))
+            /
+          clamp_min(sum(rate(refund_total[5m])), 1)
+          > 0.01
+        for: 5m
+        labels:
+          severity: P0
+          team: finance
+        annotations:
+          summary: '退款失败率超过 1%'
+          description: '过去 5 分钟退款失败率 {{ $value | humanizePercentage }}，已超过 SLO 阈值 1%，可能引发资金异常。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HighRefundFailRate'
+
+      - alert: DlqBacklog
+        expr: bullmq_queue_waiting{queue=~"orchestration-dlq.*"} > 100
+        for: 5m
+        labels:
+          severity: P1
+          team: platform
+        annotations:
+          summary: 'DLQ 堆积超过 100 条'
+          description: '队列 {{ $labels.queue }} 当前等待消息数 {{ $value }}，超过 100 阈值，请检查消费端。'
+          runbook_url: 'https://wiki.o2o.local/runbook/DlqBacklog'
+
+      - alert: HealthCheckFail
+        expr: probe_success{job="healthcheck"} == 0
         for: 3m
         labels:
-          severity: critical
+          severity: P0
+          team: platform
         annotations:
-          summary: "5xx 错误率超过 1%"
-          description: "过去 5 分钟 5xx 错误率 {{ $value | humanizePercentage }}"
+          summary: '健康检查失败：{{ $labels.instance }}'
+          description: 'Blackbox 探测目标 {{ $labels.instance }} 持续 3 分钟健康检查失败。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HealthCheckFail'
 
-      - alert: HighLatency
-        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
-        for: 3m
-        labels:
-          severity: warning
-        annotations:
-          summary: "P95 延迟超过 500ms"
-          description: "P95 延迟 {{ $value | humanizeDuration }}"
-
-      - alert: PodRestart
-        expr: increase(kube_pod_container_status_restarts_total{namespace="o2o"}[1h]) > 3
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Pod {{ $labels.pod }} 频繁重启"
-
-  # ── 业务层告警 ──
-  - name: o2o-business
-    rules:
-      - alert: LowOrderSuccessRate
-        expr: sum(rate(order_paid_total[5m])) / sum(rate(order_created_total[5m])) < 0.98
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "订单支付成功率低于 98%"
-
-      - alert: DispatchQueueBacklog
-        expr: rabbitmq_queue_messages{queue=~"o2o.dispatch.*"} > 10000
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "派单队列积压超过 10000"
-
-  # ── 基础设施告警 ──
+  # ─────────────────────────── 基础设施 ───────────────────────────
   - name: o2o-infra
+    interval: 30s
     rules:
-      - alert: HighCPU
+      - alert: MysqlHighConn
+        expr: |
+          mysql_global_status_threads_connected
+            /
+          clamp_min(mysql_global_variables_max_connections, 1)
+          > 0.8
+        for: 5m
+        labels:
+          severity: P1
+          team: dba
+        annotations:
+          summary: 'MySQL 连接数使用率超过 80%'
+          description: '实例 {{ $labels.instance }} 当前连接数占比 {{ $value | humanizePercentage }}，可能即将耗尽。'
+          runbook_url: 'https://wiki.o2o.local/runbook/MysqlHighConn'
+
+      - alert: RedisHighMem
+        expr: |
+          redis_memory_max_bytes > 0
+          and
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: P1
+          team: dba
+        annotations:
+          summary: 'Redis 内存使用率超过 90%'
+          description: '实例 {{ $labels.instance }} 内存占比 {{ $value | humanizePercentage }}，逼近上限将触发驱逐。'
+          runbook_url: 'https://wiki.o2o.local/runbook/RedisHighMem'
+
+      - alert: HighCpu
         expr: avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance) > 0.8
         for: 5m
         labels:
-          severity: warning
+          severity: P1
+          team: sre
         annotations:
-          summary: "节点 {{ $labels.instance }} CPU 使用率超过 80%"
+          summary: '节点 {{ $labels.instance }} CPU 使用率超过 80%'
+          description: '节点 {{ $labels.instance }} 持续 5 分钟 CPU 使用率 {{ $value | humanizePercentage }}。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HighCpu'
 
-      - alert: HighMemory
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+      - alert: LowDisk
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+            /
+          clamp_min(node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}, 1))
+          < 0.15
+        for: 10m
+        labels:
+          severity: P1
+          team: sre
+        annotations:
+          summary: '节点 {{ $labels.instance }} 磁盘剩余低于 15%'
+          description: '挂载点 {{ $labels.mountpoint }} 剩余空间 {{ $value | humanizePercentage }}。'
+          runbook_url: 'https://wiki.o2o.local/runbook/LowDisk'
+
+  # ─────────────────────────── 应用 ───────────────────────────
+  - name: o2o-app
+    interval: 30s
+    rules:
+      - alert: HighHttp5xx
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+          clamp_min(sum(rate(http_requests_total[5m])), 1)
+          > 0.01
+        for: 3m
+        labels:
+          severity: P0
+          team: backend
+        annotations:
+          summary: 'HTTP 5xx 错误率超过 1%'
+          description: '过去 5 分钟 HTTP 5xx 错误率 {{ $value | humanizePercentage }}。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HighHttp5xx'
+
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1.0
         for: 5m
         labels:
-          severity: warning
+          severity: P1
+          team: backend
         annotations:
-          summary: "节点内存使用率超过 85%"
+          summary: 'HTTP P95 延迟超过 1s'
+          description: '过去 5 分钟 P95 延迟 {{ $value | humanizeDuration }}，已超过 SLO 阈值 1s。'
+          runbook_url: 'https://wiki.o2o.local/runbook/HighP95Latency'
 
-      - alert: MySQLSlowQueries
-        expr: rate(mysql_global_status_slow_queries[5m]) > 0.16
+      - alert: PodRestart
+        expr: increase(kube_pod_container_status_restarts_total{namespace=~"o2o|o2o-staging|o2o-production"}[1h]) > 3
         for: 5m
         labels:
-          severity: warning
+          severity: P1
+          team: sre
         annotations:
-          summary: "MySQL 慢查询超过 10/min"
-
-      - alert: RedisHighMemory
-        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Redis 内存使用率超过 80%"
+          summary: 'Pod {{ $labels.pod }} 频繁重启'
+          description: '1 小时内 Pod {{ $labels.pod }} 重启次数 {{ $value }}。'
+          runbook_url: 'https://wiki.o2o.local/runbook/PodRestart'

@@ -451,4 +451,127 @@ describe('AccountService', () => {
       ).rejects.toThrow('真实 DB 写入故障')
     })
   })
+
+  /**
+   * P9/Sprint4 W4.A.4 增补：refund / payoutFromFrozen / casApplyDelta 防御分支
+   * 目标：account.service.ts branches 65.43% → ≥ 70%
+   */
+  describe('refund / payoutFromFrozen / casApplyDelta defensive branches', () => {
+    beforeEach(() => {
+      accountRepoFindOne.mockResolvedValue(
+        buildAccount({ id: 'A_RF', balance: '100.00', frozen: '0.00' })
+      )
+    })
+
+    it('refund happy → 走 casApplyDelta(direction=OUT) + 默认 remark "退款反向分账"', async () => {
+      managerFindOne.mockResolvedValue(
+        buildAccount({ id: 'A_RF', balance: '100.00', frozen: '0.00' })
+      )
+      const r = await service.refund(
+        AccountOwnerTypeEnum.MERCHANT,
+        'M_RF',
+        '20.00',
+        FlowBizTypeEnum.WITHDRAW
+      )
+      expect(r.account.balance).toBe('80.00')
+      expect(r.flow.direction).toBe(FlowDirectionEnum.OUT)
+      expect(r.flow.amount).toBe('20.00')
+      expect(r.flow.remark).toBe('退款反向分账')
+    })
+
+    it('refund amount=0 → PARAM_INVALID', async () => {
+      await expect(
+        service.refund(AccountOwnerTypeEnum.MERCHANT, 'M_RF', '0', FlowBizTypeEnum.WITHDRAW)
+      ).rejects.toMatchObject({ bizCode: BizErrorCode.PARAM_INVALID })
+    })
+
+    it('refund amount=负数 → PARAM_INVALID', async () => {
+      await expect(
+        service.refund(AccountOwnerTypeEnum.MERCHANT, 'M_RF', '-5.00', FlowBizTypeEnum.WITHDRAW)
+      ).rejects.toMatchObject({ bizCode: BizErrorCode.PARAM_INVALID })
+    })
+
+    it('refund options.remark 自定义时使用自定义文本', async () => {
+      managerFindOne.mockResolvedValue(
+        buildAccount({ id: 'A_RF', balance: '100.00', frozen: '0.00' })
+      )
+      const r = await service.refund(
+        AccountOwnerTypeEnum.MERCHANT,
+        'M_RF',
+        '10.00',
+        FlowBizTypeEnum.WITHDRAW,
+        { remark: '自定义文案', relatedNo: 'X1', opAdminId: 'admin-1' }
+      )
+      expect(r.flow.remark).toBe('自定义文案')
+      expect(r.flow.relatedNo).toBe('X1')
+      expect(r.flow.opAdminId).toBe('admin-1')
+    })
+
+    it('payoutFromFrozen amount=0 → PARAM_INVALID', async () => {
+      await expect(service.payoutFromFrozen('A1', '0')).rejects.toMatchObject({
+        bizCode: BizErrorCode.PARAM_INVALID
+      })
+    })
+
+    it('payoutFromFrozen happy → frozen -= amount', async () => {
+      managerFindOne.mockResolvedValue(
+        buildAccount({ id: 'A_PF', balance: '0.00', frozen: '50.00' })
+      )
+      const r = await service.payoutFromFrozen('A_PF', '20.00')
+      expect(r.account.frozen).toBe('30.00')
+    })
+
+    it('casApplyDelta 账户不存在 → BIZ_RESOURCE_NOT_FOUND', async () => {
+      managerFindOne.mockResolvedValue(null)
+      await expect(
+        service.refund(
+          AccountOwnerTypeEnum.MERCHANT,
+          'M_NOEXIST',
+          '10.00',
+          FlowBizTypeEnum.WITHDRAW
+        )
+      ).rejects.toMatchObject({ bizCode: BizErrorCode.BIZ_RESOURCE_NOT_FOUND })
+    })
+
+    it('casApplyDelta 账户已冻结（status!=NORMAL）→ BIZ_OPERATION_FORBIDDEN', async () => {
+      managerFindOne.mockResolvedValue(buildAccount({ id: 'A_FROZEN', status: 2 }))
+      await expect(
+        service.refund(AccountOwnerTypeEnum.MERCHANT, 'M_FROZEN', '10.00', FlowBizTypeEnum.WITHDRAW)
+      ).rejects.toMatchObject({ bizCode: BizErrorCode.BIZ_OPERATION_FORBIDDEN })
+    })
+
+    it('casApplyDelta frozen 不足 → BIZ_DATA_CONFLICT（payoutFromFrozen 超额）', async () => {
+      managerFindOne.mockResolvedValue(
+        buildAccount({ id: 'A_LF', balance: '0.00', frozen: '5.00' })
+      )
+      await expect(service.payoutFromFrozen('A_LF', '20.00')).rejects.toMatchObject({
+        bizCode: BizErrorCode.BIZ_DATA_CONFLICT
+      })
+    })
+  })
+
+  describe('findManyByOwners empty + dedup', () => {
+    it('空 ownerIds → 空 Map，不查 DB', async () => {
+      const result = await service.findManyByOwners(AccountOwnerTypeEnum.MERCHANT, [])
+      expect(result.size).toBe(0)
+    })
+
+    it('多 ownerId 去重 + 返回 Map', async () => {
+      const accountRepoFind = jest
+        .fn()
+        .mockResolvedValue([
+          buildAccount({ id: 'A1', ownerId: 'M1' }),
+          buildAccount({ id: 'A2', ownerId: 'M2' })
+        ])
+      ;(service as unknown as { accountRepo: { find: jest.Mock } }).accountRepo.find =
+        accountRepoFind
+      const result = await service.findManyByOwners(AccountOwnerTypeEnum.MERCHANT, [
+        'M1',
+        'M2',
+        'M1'
+      ])
+      expect(result.size).toBe(2)
+      expect(result.get('M1')?.id).toBe('A1')
+    })
+  })
 })

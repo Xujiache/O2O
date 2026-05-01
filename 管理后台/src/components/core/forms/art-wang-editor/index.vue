@@ -71,9 +71,10 @@
   } as const
 
   // 计算属性：上传服务器地址
+  // P9 Sprint 4 / W4.A.3：默认走 file 模块真 MinIO 上传端点（bizModule=editor），
+  // 后端 file.controller @Post('upload') 校验：MIME image/* + 单文件 ≤ 5 MB（DEFAULT_UPLOAD_CONFIG）
   const uploadServer = computed(
-    () =>
-      props.uploadConfig?.server || `${import.meta.env.VITE_API_URL}/api/common/upload/wangeditor`
+    () => props.uploadConfig?.server || `${import.meta.env.VITE_API_URL ?? ''}/api/v1/file/upload`
   )
 
   // 合并上传配置
@@ -104,7 +105,7 @@
     return config
   })
 
-  // 编辑器配置
+  // 编辑器配置（不直接引用 hljs；hljs 在 onMounted 内通过 await import('highlight.js') 异步注入）
   const editorConfig: Partial<IEditorConfig> = {
     placeholder: props.placeholder,
     MENU_CONF: {
@@ -114,16 +115,40 @@
         maxNumberOfFiles: mergedUploadConfig.value.maxNumberOfFiles,
         allowedFileTypes: mergedUploadConfig.value.allowedFileTypes,
         server: uploadServer.value,
+        /* P9 Sprint 4 / W4.A.3：随上传 form 一起带 bizModule=editor + isPublic=true */
+        meta: {
+          bizModule: 'editor',
+          isPublic: 'true'
+        },
+        metaWithUrl: false,
         headers: {
           Authorization: userStore.accessToken
         },
-        onSuccess() {
-          ElMessage.success(`图片上传成功 ${EmojiText[200]}`)
+        /**
+         * P9 Sprint 4 / W4.A.3：解析后端 ApiResponse 包裹的 FileUploadResultDto
+         *   后端返回：{ code: 0, data: { fileNo, url, ...}, msg }
+         *   wangEditor 期望：{ errno: 0, data: { url, alt?, href? } }
+         */
+        customInsert(res: unknown, insertFn: (url: string, alt?: string, href?: string) => void) {
+          try {
+            const r = res as { code?: number; data?: { url?: string }; msg?: string }
+            if (r && r.code === 0 && r.data && typeof r.data.url === 'string') {
+              insertFn(r.data.url, '', r.data.url)
+              ElMessage.success(`图片上传成功 ${EmojiText[200]}`)
+              return
+            }
+            ElMessage.error(`图片上传失败：${r?.msg ?? '响应格式异常'}`)
+          } catch {
+            ElMessage.error(`图片上传失败 ${EmojiText[500]}`)
+          }
         },
-        onError(file: File, err: any, res: any) {
-          console.error('图片上传失败:', err, res)
-          ElMessage.error(`图片上传失败 ${EmojiText[500]}`)
+        onError(file: File, err: unknown) {
+          ElMessage.error(`图片上传失败：${(err as Error)?.message ?? EmojiText[500]}`)
         }
+      },
+      // 代码块菜单 — 语言列表延迟初始化（默认空，onMounted 中异步注入）
+      codeSelectLang: {
+        codeLangs: [] as Array<{ text: string; value: string }>
       }
     }
   }
@@ -132,9 +157,9 @@
   const onCreateEditor = (editor: IDomEditor) => {
     editorRef.value = editor
 
-    // 监听全屏事件
+    // 监听全屏事件（占位：保留挂载点，便于后续埋点）
     editor.on('fullScreen', () => {
-      console.log('编辑器进入全屏模式')
+      // no-op
     })
 
     // 确保在编辑器创建后应用自定义图标
@@ -202,7 +227,34 @@
   })
 
   // 生命周期
-  onMounted(() => {
+  onMounted(async () => {
+    // P9 Sprint 4 W4.D.4：highlight.js 改为异步 import，独立 chunk vendor-highlight-async
+    // 不在顶部 import，避免被打包进首屏同步 chunk；只有挂载本组件时才下载 hljs。
+    try {
+      const hljsModule = await import('highlight.js')
+      const hljs = hljsModule.default ?? hljsModule
+      // 注入到 wangEditor 代码高亮菜单的语言列表（延迟可用）
+      const codeLangs = [
+        { text: 'JavaScript', value: 'javascript' },
+        { text: 'TypeScript', value: 'typescript' },
+        { text: 'HTML', value: 'html' },
+        { text: 'CSS', value: 'css' },
+        { text: 'JSON', value: 'json' },
+        { text: 'Java', value: 'java' },
+        { text: 'Python', value: 'python' },
+        { text: 'Go', value: 'go' },
+        { text: 'Shell', value: 'bash' }
+      ]
+      const menuConf = (editorConfig.MENU_CONF ?? {}) as Record<string, unknown>
+      const codeMenu = (menuConf.codeSelectLang ?? {}) as { codeLangs?: typeof codeLangs }
+      codeMenu.codeLangs = codeLangs
+      menuConf.codeSelectLang = codeMenu
+      editorConfig.MENU_CONF = menuConf as IEditorConfig['MENU_CONF']
+      // 暴露到 window 供 wangEditor 内部代码块插件按需调用（保持向后兼容）
+      ;(window as unknown as { hljs?: unknown }).hljs = hljs
+    } catch (err) {
+      console.warn('highlight.js 异步加载失败，代码高亮将降级为普通文本:', err)
+    }
     // 图标替换已在 onCreateEditor 中处理
   })
 

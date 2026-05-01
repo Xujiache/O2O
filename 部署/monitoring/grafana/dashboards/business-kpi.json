@@ -4,56 +4,202 @@
     "uid": "o2o-business-kpi",
     "timezone": "Asia/Shanghai",
     "refresh": "30s",
+    "schemaVersion": 38,
     "panels": [
       {
-        "title": "订单创建速率",
+        "id": 1,
+        "title": "今日订单数",
         "type": "stat",
         "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-        "targets": [{ "expr": "sum(rate(order_created_total[5m])) * 60", "legendFormat": "orders/min" }]
+        "targets": [
+          { "expr": "sum(increase(order_created_total[24h]))", "legendFormat": "orders" }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [{ "value": null, "color": "blue" }]
+            }
+          }
+        }
       },
       {
+        "id": 2,
+        "title": "今日 GMV",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "targets": [{ "expr": "sum(increase(order_amount_total[24h]))", "legendFormat": "GMV" }],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyCNY",
+            "decimals": 2
+          }
+        }
+      },
+      {
+        "id": 3,
         "title": "支付成功率",
         "type": "gauge",
-        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-        "targets": [{ "expr": "sum(rate(order_paid_total[1h])) / sum(rate(order_created_total[1h]))", "legendFormat": "Pay Rate" }],
-        "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [{ "value": 0, "color": "red" }, { "value": 0.95, "color": "yellow" }, { "value": 0.98, "color": "green" }] } } }
-      },
-      {
-        "title": "GMV (预估)",
-        "type": "stat",
         "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-        "targets": [{ "expr": "sum(increase(order_paid_total[24h])) * 25", "legendFormat": "GMV" }],
-        "fieldConfig": { "defaults": { "unit": "currencyCNY" } }
+        "targets": [
+          {
+            "expr": "sum(rate(payment_succeed_total[5m])) / clamp_min(sum(rate(payment_total[5m])), 1)",
+            "legendFormat": "Pay Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "red" },
+                { "value": 0.95, "color": "yellow" },
+                { "value": 0.97, "color": "green" }
+              ]
+            }
+          }
+        }
       },
       {
-        "title": "骑手上报频次",
-        "type": "stat",
+        "id": 4,
+        "title": "派单成功率",
+        "type": "gauge",
         "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-        "targets": [{ "expr": "sum(rate(rider_location_reports_total[5m]))", "legendFormat": "reports/s" }]
+        "targets": [
+          {
+            "expr": "sum(rate(dispatch_succeed_total[5m])) / clamp_min(sum(rate(dispatch_total[5m])), 1)",
+            "legendFormat": "Dispatch Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "red" },
+                { "value": 0.85, "color": "yellow" },
+                { "value": 0.9, "color": "green" }
+              ]
+            }
+          }
+        }
       },
       {
-        "title": "订单趋势（外卖 vs 跑腿）",
+        "id": 5,
+        "title": "DLQ 堆积",
         "type": "timeseries",
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
         "targets": [
-          { "expr": "sum(rate(order_created_total{type=\"takeout\"}[5m])) * 60", "legendFormat": "外卖" },
-          { "expr": "sum(rate(order_created_total{type=\"errand\"}[5m])) * 60", "legendFormat": "跑腿" }
-        ]
+          {
+            "expr": "bullmq_queue_waiting{queue=~\"orchestration-dlq.*\"}",
+            "legendFormat": "{{queue}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": null, "color": "green" },
+                { "value": 100, "color": "red" }
+              ]
+            }
+          }
+        }
       },
       {
-        "title": "派单决策耗时",
+        "id": 6,
+        "title": "HTTP 5xx 错误率",
         "type": "timeseries",
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
         "targets": [
-          { "expr": "histogram_quantile(0.5, sum(rate(dispatch_decision_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P50" },
-          { "expr": "histogram_quantile(0.95, sum(rate(dispatch_decision_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P95" }
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1)",
+            "legendFormat": "5xx ratio"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "P95 延迟",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "订单趋势（外卖 vs 跑腿）",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+        "targets": [
+          {
+            "expr": "sum(rate(order_created_total{type=\"takeout\"}[5m])) * 60",
+            "legendFormat": "外卖"
+          },
+          {
+            "expr": "sum(rate(order_created_total{type=\"errand\"}[5m])) * 60",
+            "legendFormat": "跑腿"
+          }
         ]
       },
       {
+        "id": 9,
+        "title": "派单决策耗时",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, sum(rate(dispatch_decision_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(dispatch_decision_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          }
+        ]
+      },
+      {
+        "id": 10,
         "title": "RPC 失败",
         "type": "timeseries",
-        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
-        "targets": [{ "expr": "sum by (service, reason) (rate(business_rpc_failure_total[5m]))", "legendFormat": "{{service}}-{{reason}}" }]
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+        "targets": [
+          {
+            "expr": "sum by (service, reason) (rate(business_rpc_failure_total[5m]))",
+            "legendFormat": "{{service}}-{{reason}}"
+          }
+        ]
       }
     ]
   }

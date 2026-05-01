@@ -18,6 +18,8 @@ export const UPLOAD_BIZ_MODULES = [
   'shop',
   'video',
   'temp',
+  /** P9 Sprint 4 / W4.A.3：管理后台 wangEditor 富文本图片上传专用 */
+  'editor',
   'other'
 ] as const
 export type UploadBizModule = (typeof UPLOAD_BIZ_MODULES)[number]

@@ -1,8 +1,8 @@
 /**
  * @file dlq-retry.processor.ts
- * @stage P9 Sprint 3 / W3.B.2
+ * @stage P9 Sprint 3 / W3.B.2 + P9 Sprint 4 / W4.A.2（真重试落地）
  * @desc DLQ 自动重试 Processor + 首次落库器
- * @author 单 Agent V2.0（Sprint 3 Agent B）
+ * @author 单 Agent V2.0（Sprint 3 Agent B + Sprint 4 Agent A）
  *
  * 设计：
  *   - 监听独立 BullMQ 队列 `orchestration-dlq-retry`，由 DlqLogService（业务调用）
@@ -18,10 +18,13 @@
  *   - 第 1~3 次失败：status=PENDING + retry_count++ + nextRetryAt
  *   - 第 4 次仍失败：status=PERMANENT_FAILED + logger.error + 钉钉告警占位
  *
- * 真重试逻辑（按需启用，本期默认简版）：
- *   a) 简版（默认）：仅写 dlq_retry_log + 日志告警 ← 当前实现
- *   b) 真重试：根据 sagaName 路由到对应 saga 服务的 publish 方法重投事件
- *      → TODO P10：注入 PaymentEventsConsumer / OrderEventsConsumer 的 dispatch
+ * 真重试逻辑（P9 Sprint 4 W4.A.2 落地）：
+ *   - 按 data.source 路由：
+ *       'order'   → @Optional() ORDER_EVENTS_PUBLISHER.publish(body as OrderEventPayload)
+ *       'payment' → @Optional() PAYMENT_EVENTS_PUBLISHER.publish(body as PaymentEventPayload)
+ *       'cron'/'manual' → 跳过真重试（仅写 dlq_retry_log）
+ *   - 若 publisher 未注入（测试/Mock 模式）→ 跳过真重试，仅写 dlq_retry_log + 钉钉告警占位
+ *   - 真重试失败：仍计入 retryCount；3 次后转 PERMANENT_FAILED
  *
  * 兼容备注：
  *   - 队列名导出在本文件，避免侵入 orchestration.types.ts
@@ -29,13 +32,23 @@
  */
 
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq'
-import { Injectable, Logger, Optional } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import type { Job, Queue } from 'bullmq'
 import { Repository } from 'typeorm'
 import { DlqRetryLog, DlqRetryLogStatusEnum } from '@/entities'
+import {
+  ORDER_EVENTS_PUBLISHER,
+  type OrderEventPayload
+} from '@/modules/order/events/order-events.constants'
+import { type OrderEventsPublisher } from '@/modules/order/events/order-events.publisher'
+import {
+  PAYMENT_EVENTS_PUBLISHER,
+  type PaymentEventPayload,
+  type PaymentEventsPublisher
+} from '@/modules/payment/services/payment-events.publisher'
 import { SnowflakeId } from '@/utils'
-import { type OrchestrationDlqJob } from '../types/orchestration.types'
+import { EventSourceEnum, type OrchestrationDlqJob } from '../types/orchestration.types'
 
 /** DLQ 自动重试独立队列名（避免与 orchestration-dlq 争用 Worker） */
 export const ORCHESTRATION_DLQ_RETRY_QUEUE = 'orchestration-dlq-retry'
@@ -63,7 +76,17 @@ export class DlqRetryProcessor extends WorkerHost {
     private readonly logRepo?: Repository<DlqRetryLog>,
     @Optional()
     @InjectQueue(ORCHESTRATION_DLQ_RETRY_QUEUE)
-    private readonly retryQueue?: Queue<OrchestrationDlqJob>
+    private readonly retryQueue?: Queue<OrchestrationDlqJob>,
+    /**
+     * P9 Sprint 4 / W4.A.2：按 source 路由 publish 真重试。
+     * 缺失任一 publisher（mock/单测）→ 跳过真重试，仅写 dlq_retry_log + 钉钉告警占位。
+     */
+    @Optional()
+    @Inject(ORDER_EVENTS_PUBLISHER)
+    private readonly orderPublisher?: OrderEventsPublisher,
+    @Optional()
+    @Inject(PAYMENT_EVENTS_PUBLISHER)
+    private readonly paymentPublisher?: PaymentEventsPublisher
   ) {
     super()
   }
@@ -151,10 +174,89 @@ export class DlqRetryProcessor extends WorkerHost {
       return { status: 'PERMANENT_FAILED' }
     }
 
+    /* P9 Sprint 4 / W4.A.2：按 source 路由 publish 真重试 */
+    const republished = await this.republishBySource(data)
+    if (republished === 'OK') {
+      try {
+        entity.status = DlqRetryLogStatusEnum.RETRY_OK
+        await this.logRepo.save(entity)
+      } catch (err) {
+        this.logger.warn(
+          `[DLQ-RETRY] mark RETRY_OK 失败 id=${data.sagaId}：${err instanceof Error ? err.message : String(err)}`
+        )
+      }
+      this.logger.log(
+        `[DLQ-RETRY] RETRY_OK saga=${data.sagaName} id=${data.sagaId} retry=${newRetry}/${DLQ_MAX_RETRY}`
+      )
+      return { status: 'RETRY_OK' }
+    }
+
     this.logger.warn(
-      `[DLQ-RETRY] PENDING saga=${data.sagaName} id=${data.sagaId} retry=${newRetry}/${DLQ_MAX_RETRY} nextAt=${entity.nextRetryAt?.toISOString()}`
+      `[DLQ-RETRY] PENDING saga=${data.sagaName} id=${data.sagaId} retry=${newRetry}/${DLQ_MAX_RETRY} nextAt=${entity.nextRetryAt?.toISOString()} republish=${republished}`
     )
     return { status: 'PENDING' }
+  }
+
+  /**
+   * 按 source 路由重新发布事件
+   * 返回值：
+   *   - 'OK'              真重试发布成功
+   *   - 'NO_PUBLISHER'    publisher 未注入（mock / 单测模式）
+   *   - 'UNSUPPORTED'     source 是 cron / manual 不支持自动重发
+   *   - 'INVALID_BODY'    body 无效或不符合对应 payload 形态
+   *   - 'PUBLISH_FAILED'  publish 抛错
+   */
+  private async republishBySource(data: OrchestrationDlqJob): Promise<string> {
+    if (data.source === EventSourceEnum.ORDER) {
+      if (!this.orderPublisher) return 'NO_PUBLISHER'
+      const payload = this.coerceOrderPayload(data.body)
+      if (!payload) return 'INVALID_BODY'
+      try {
+        await this.orderPublisher.publish(payload)
+        return 'OK'
+      } catch (err) {
+        this.logger.warn(
+          `[DLQ-REPUBLISH] order publish 失败 saga=${data.sagaId}：${err instanceof Error ? err.message : String(err)}`
+        )
+        return 'PUBLISH_FAILED'
+      }
+    }
+    if (data.source === EventSourceEnum.PAYMENT) {
+      if (!this.paymentPublisher) return 'NO_PUBLISHER'
+      const payload = this.coercePaymentPayload(data.body)
+      if (!payload) return 'INVALID_BODY'
+      try {
+        await this.paymentPublisher.publish(payload)
+        return 'OK'
+      } catch (err) {
+        this.logger.warn(
+          `[DLQ-REPUBLISH] payment publish 失败 saga=${data.sagaId}：${err instanceof Error ? err.message : String(err)}`
+        )
+        return 'PUBLISH_FAILED'
+      }
+    }
+    /* cron / manual：不支持自动重发，业务自行从 saga_state 续跑 */
+    return 'UNSUPPORTED'
+  }
+
+  /**
+   * body → OrderEventPayload（最小字段校验）
+   */
+  private coerceOrderPayload(body: unknown): OrderEventPayload | null {
+    if (!body || typeof body !== 'object') return null
+    const b = body as Record<string, unknown>
+    if (typeof b.eventName !== 'string' || typeof b.orderNo !== 'string') return null
+    return b as unknown as OrderEventPayload
+  }
+
+  /**
+   * body → PaymentEventPayload（最小字段校验）
+   */
+  private coercePaymentPayload(body: unknown): PaymentEventPayload | null {
+    if (!body || typeof body !== 'object') return null
+    const b = body as Record<string, unknown>
+    if (typeof b.eventName !== 'string' || typeof b.payNo !== 'string') return null
+    return b as unknown as PaymentEventPayload
   }
 
   /**

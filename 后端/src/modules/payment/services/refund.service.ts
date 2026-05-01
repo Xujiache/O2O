@@ -33,7 +33,7 @@
  *     调 SettlementService.reverseForOrder 完成反向分账闭环。
  */
 
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
 import BigNumber from 'bignumber.js'
 import { createHash } from 'crypto'
@@ -43,6 +43,13 @@ import { BizErrorCode, BusinessException } from '@/common'
 import { PaymentRecord, RefundRecord } from '@/entities'
 import { REDIS_CLIENT } from '@/health/redis.provider'
 import { OperationLogService } from '@/modules/user/services/operation-log.service'
+import { SysConfigService } from '@/modules/system/sys-config.service'
+import {
+  DEFAULT_REFUND_AUTO_THRESHOLD,
+  DEFAULT_REFUND_T1_WINDOW_HOURS,
+  SYS_KEY_REFUND_AUTO_THRESHOLD,
+  SYS_KEY_REFUND_T1_WINDOW_HOURS
+} from '@/modules/system/sys-config.keys'
 import { SnowflakeId } from '@/utils'
 import {
   PAYMENT_ADAPTER_REGISTRY,
@@ -121,8 +128,79 @@ export class RefundService {
     private readonly balanceService: BalanceService,
     @Inject(PAYMENT_EVENTS_PUBLISHER)
     private readonly publisher: PaymentEventsPublisher,
-    private readonly operationLogService: OperationLogService
+    private readonly operationLogService: OperationLogService,
+    /**
+     * P9 Sprint 4 / W4.A.1：sys_config 接入。
+     *   - canAutoRefund 工具方法用 SYS_KEY_REFUND_T1_WINDOW_HOURS / SYS_KEY_REFUND_AUTO_THRESHOLD 决策
+     *   - @Optional() 保证旧测试 / mock 模式不阻塞，缺失时回退默认值
+     */
+    @Optional() private readonly sysConfigService?: SysConfigService
   ) {}
+
+  /**
+   * 自动退款决策（T+1 窗口 + 阈值）
+   *
+   * 用途：未来自动退款 cron / saga 在创建退款前调用，决定是否在 T+1 窗口内 + 单笔金额是否在阈值之下。
+   * 参数：
+   *   - payCreatedAt 支付单创建时间（用 paid_at 或 created_at）
+   *   - refundAmount 本次退款金额（string）
+   *   - now 测试可注入；默认 Date.now()
+   * 返回值：{ allowed: true } 或 { allowed: false, reason }
+   */
+  async canAutoRefund(
+    payCreatedAt: Date | number,
+    refundAmount: string,
+    now: number = Date.now()
+  ): Promise<{ allowed: boolean; reason?: string }> {
+    const windowHours = await this.resolveT1WindowHours()
+    const threshold = await this.resolveAutoThreshold()
+    const createdMs = payCreatedAt instanceof Date ? payCreatedAt.getTime() : payCreatedAt
+    const elapsedHours = (now - createdMs) / (3600 * 1000)
+    if (elapsedHours > windowHours) {
+      return {
+        allowed: false,
+        reason: `已超出 T+1 窗口（${windowHours}h；已过 ${elapsedHours.toFixed(1)}h）`
+      }
+    }
+    const amt = new BigNumber(refundAmount)
+    if (!amt.isFinite() || amt.isLessThanOrEqualTo(0)) {
+      return { allowed: false, reason: `refundAmount 非法：${refundAmount}` }
+    }
+    const cap = new BigNumber(threshold)
+    if (amt.isGreaterThan(cap)) {
+      return {
+        allowed: false,
+        reason: `单笔金额超出自动退款阈值（${threshold}；本次 ${amt.toFixed(2)}）`
+      }
+    }
+    return { allowed: true }
+  }
+
+  /**
+   * 解析 T+1 自动退款窗口（小时）
+   */
+  private async resolveT1WindowHours(): Promise<number> {
+    if (!this.sysConfigService) return DEFAULT_REFUND_T1_WINDOW_HOURS
+    const v = await this.sysConfigService.get<number>(
+      SYS_KEY_REFUND_T1_WINDOW_HOURS,
+      DEFAULT_REFUND_T1_WINDOW_HOURS
+    )
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : DEFAULT_REFUND_T1_WINDOW_HOURS
+  }
+
+  /**
+   * 解析自动退款阈值（金额字符串）
+   */
+  private async resolveAutoThreshold(): Promise<string> {
+    if (!this.sysConfigService) return DEFAULT_REFUND_AUTO_THRESHOLD
+    const v = await this.sysConfigService.get<string | number>(
+      SYS_KEY_REFUND_AUTO_THRESHOLD,
+      DEFAULT_REFUND_AUTO_THRESHOLD
+    )
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) return String(v)
+    if (typeof v === 'string' && new BigNumber(v).isFinite()) return v
+    return DEFAULT_REFUND_AUTO_THRESHOLD
+  }
 
   /* ============================================================================
    * 1. 创建退款
