@@ -75,7 +75,7 @@
       <text class="rs__label">评价标签（可多选）</text>
       <view class="rs__tags">
         <view
-          v-for="t in TAG_OPTIONS"
+          v-for="t in tagOptions"
           :key="t"
           class="rs__tag"
           :class="{ 'rs__tag--active': selectedTags.includes(t) }"
@@ -110,13 +110,16 @@
   import { ref, computed } from 'vue'
   import { onLoad } from '@dcloudio/uni-app'
   import BizLoading from '@/components/biz/BizLoading.vue'
-  import { submitReview } from '@/api/review'
+  import { submitReview, getReviewTags } from '@/api/review'
   import { uploadImages } from '@/api/file'
   import { logger } from '@/utils/logger'
   import { track, TRACK } from '@/utils/track'
 
-  /** 标签备选（前端硬编码，与 PRD 一致；好评+中差评共 8 个） */
-  const TAG_OPTIONS = [
+  /**
+   * 默认标签兜底（与后端 DEFAULT_REVIEW_TAGS 对齐；接口失败时使用）
+   * W6.E.2：评价标签接口化后，硬编码降级为 fallback
+   */
+  const FALLBACK_TAGS: ReadonlyArray<string> = [
     '味道很赞',
     '分量足',
     '包装精美',
@@ -125,7 +128,7 @@
     '性价比高',
     '味道一般',
     '送达较慢'
-  ] as const
+  ]
 
   const orderNo = ref<string>('')
   const shopRating = ref<1 | 2 | 3 | 4 | 5>(5)
@@ -134,6 +137,8 @@
   const content = ref<string>('')
   const images = ref<string[]>([])
   const selectedTags = ref<string[]>([])
+  /** W6.E.2：标签后端配置化；初始化时取 /me/reviews/tags，失败用 FALLBACK_TAGS 兜底 */
+  const tagOptions = ref<string[]>([...FALLBACK_TAGS])
   const submitting = ref<boolean>(false)
   const uploading = ref<boolean>(false)
   let lastSubmitAt = 0
@@ -151,7 +156,26 @@
       return
     }
     orderNo.value = no
+    void loadTags()
   })
+
+  /**
+   * 拉取评价标签（W6.E.2 真接入）
+   * 失败时静默使用 FALLBACK_TAGS（不阻塞用户提交评价）
+   */
+  async function loadTags(): Promise<void> {
+    try {
+      const remote = await getReviewTags()
+      if (Array.isArray(remote) && remote.length > 0) {
+        tagOptions.value = remote.filter((t): t is string => typeof t === 'string' && Boolean(t))
+        return
+      }
+      tagOptions.value = [...FALLBACK_TAGS]
+    } catch (e) {
+      logger.warn('review.tags.load.fail', { e: String(e) })
+      tagOptions.value = [...FALLBACK_TAGS]
+    }
+  }
 
   function ratingText(r: 1 | 2 | 3 | 4 | 5): string {
     return ['', '很差', '较差', '一般', '满意', '非常满意'][r] ?? ''

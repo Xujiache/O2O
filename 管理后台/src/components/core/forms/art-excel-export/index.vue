@@ -19,11 +19,15 @@
 </template>
 
 <script setup lang="ts">
-  import * as XLSX from 'xlsx'
+  // P9 Sprint 6 W6.D.3：xlsx 改为 await import 动态加载
+  //   - 移除顶层 `import * as XLSX from 'xlsx'`
+  //   - 真正点击导出按钮时 await import('xlsx')，xlsx 仅在使用时进入网络请求
+  //   - 类型仅用于 ColInfo，使用 type-only import，不会被打入首屏 chunk
   import FileSaver from 'file-saver'
   import { ref, computed, nextTick } from 'vue'
   import { Loading } from '@element-plus/icons-vue'
   import type { ButtonType } from 'element-plus'
+  import type { ColInfo } from 'xlsx'
   import { useThrottleFn } from '@vueuse/core'
 
   defineOptions({ name: 'ArtExcelExport' })
@@ -210,7 +214,7 @@
   }
 
   /** 计算列宽度 */
-  const calculateColumnWidths = (data: Record<string, string>[]): XLSX.ColInfo[] => {
+  const calculateColumnWidths = (data: Record<string, string>[]): ColInfo[] => {
     if (data.length === 0) return []
 
     const sampleSize = Math.min(data.length, 100) // 只取前100行计算列宽
@@ -244,6 +248,10 @@
   ): Promise<void> => {
     try {
       emit('export-progress', 10)
+
+      // P9 Sprint 6 W6.D.3：xlsx 在点击导出时按需 import，独立 chunk vendor-xlsx
+      // 仅在用户首次点击导出按钮时下载（约 277KB），不进入首屏 modulepreload
+      const XLSX = await import('xlsx')
 
       // 处理数据
       const processedData = processData(data)

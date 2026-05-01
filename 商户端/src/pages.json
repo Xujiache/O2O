@@ -85,7 +85,8 @@
       "pages": [
         { "path": "category", "style": { "navigationBarTitleText": "商品分类" } },
         { "path": "edit", "style": { "navigationBarTitleText": "编辑商品" } },
-        { "path": "discount", "style": { "navigationBarTitleText": "限时折扣" } }
+        { "path": "discount", "style": { "navigationBarTitleText": "限时折扣" } },
+        { "path": "combo-edit", "style": { "navigationBarTitleText": "编辑套餐" } }
       ]
     },
     {

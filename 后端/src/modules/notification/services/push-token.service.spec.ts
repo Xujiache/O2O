@@ -266,4 +266,93 @@ describe('PushTokenService', () => {
     expect(list).toEqual([])
     expect(find).not.toHaveBeenCalled()
   })
+
+  /* ============================================================================ */
+  /* P9 Sprint 6 / W6.A.2 增补：补 branches 60.71% → ≥ 70%                          */
+  /* 目标：覆盖 heartbeat / unregister 的 deviceId 双分支 + register 各路径          */
+  /* ============================================================================ */
+
+  it('heartbeat userId 空 → 直接返回 param_empty 不查 DB', async () => {
+    const { repo, createQueryBuilder } = makeRepo()
+    const svc = new PushTokenService(repo)
+    const r = await svc.heartbeat('', 1, 'dev-1')
+    expect(r.ok).toBe(false)
+    expect(r.message).toBe('param_empty')
+    expect(createQueryBuilder).not.toHaveBeenCalled()
+  })
+
+  it('heartbeat 不带 deviceId → 不调 device_id 子句', async () => {
+    const { repo } = makeRepo()
+    const updateChain = makeUpdateChain({ affected: 2 })
+    const cqb = jest.fn().mockReturnValue({
+      update: jest.fn().mockReturnValue(updateChain)
+    })
+    ;(repo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder = cqb
+
+    const svc = new PushTokenService(repo)
+    const r = await svc.heartbeat('u-1', 2)
+    expect(r.ok).toBe(true)
+    expect(r.message).toBe('affected_2')
+    /* andWhere 应被调三次：user_type / is_deleted / 但不含 device_id */
+    const calls = updateChain.andWhere.mock.calls
+    const hasDeviceId = calls.some((c: unknown[]) => String(c[0]).includes('device_id'))
+    expect(hasDeviceId).toBe(false)
+  })
+
+  it('unregister userId 空 → param_empty', async () => {
+    const { repo } = makeRepo()
+    const svc = new PushTokenService(repo)
+    const r = await svc.unregister('', 1)
+    expect(r.ok).toBe(false)
+    expect(r.message).toBe('param_empty')
+  })
+
+  it('unregister 不带 deviceId → 不加 device_id 子句', async () => {
+    const { repo } = makeRepo()
+    const updateChain = makeUpdateChain({ affected: 5 })
+    const cqb = jest.fn().mockReturnValue({
+      update: jest.fn().mockReturnValue(updateChain)
+    })
+    ;(repo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder = cqb
+
+    const svc = new PushTokenService(repo)
+    const r = await svc.unregister('u-2', 1)
+    expect(r.ok).toBe(true)
+    expect(r.message).toBe('affected_5')
+    const calls = updateChain.andWhere.mock.calls
+    const hasDeviceId = calls.some((c: unknown[]) => String(c[0]).includes('device_id'))
+    expect(hasDeviceId).toBe(false)
+  })
+
+  it('register registrationId / platform 空 → param_empty', async () => {
+    const { repo } = makeRepo()
+    const svc = new PushTokenService(repo)
+    const r1 = await svc.register({
+      userId: 'u-1',
+      userType: 1,
+      platform: '',
+      registrationId: 'rid-1'
+    })
+    expect(r1.ok).toBe(false)
+    const r2 = await svc.register({
+      userId: 'u-1',
+      userType: 1,
+      platform: 'ios',
+      registrationId: ''
+    })
+    expect(r2.ok).toBe(false)
+  })
+
+  it('cleanInactive affected=0 → 不打 log（无 return 影响）', async () => {
+    const { repo } = makeRepo()
+    const updateChain = makeUpdateChain({ affected: 0 })
+    const cqb = jest.fn().mockReturnValue({
+      update: jest.fn().mockReturnValue(updateChain)
+    })
+    ;(repo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder = cqb
+
+    const svc = new PushTokenService(repo)
+    const n = await svc.cleanInactive(7)
+    expect(n).toBe(0)
+  })
 })

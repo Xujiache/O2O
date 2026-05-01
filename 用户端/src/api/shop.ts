@@ -4,7 +4,7 @@
  * @desc 店铺 / 商品 API：列表（GEO 排序）、详情、商品、SKU、评价
  * @author 单 Agent V2.0
  */
-import { get } from '@/utils/request'
+import { get, post } from '@/utils/request'
 import type {
   Shop,
   Product,
@@ -16,6 +16,57 @@ import type {
   Notice,
   QuickEntry
 } from '@/types/biz'
+
+/* ========== 搜索 ========== */
+
+/** 商品搜索结果项（与后端 SearchProductItemVo 对齐） */
+export interface SearchProductItem {
+  id: string
+  name: string
+  brief: string | null
+  mainImageUrl: string | null
+  price: string
+  originalPrice: string | null
+  monthlySales: number
+  score: string
+  scoreCount: number
+  shopId: string
+  shopName: string
+  shopShortName: string | null
+  shopLogoUrl: string | null
+  /** 0 打烊 / 1 营业 / 2 临时歇业 */
+  shopBusinessStatus: number
+}
+
+/** 跑腿模板搜索结果项 */
+export interface SearchErrandTemplateItem {
+  serviceType: 1 | 2 | 3 | 4
+  name: string
+  description: string
+  basePrice: string
+  tags: string[]
+}
+
+/**
+ * 商品搜索（POST /search/products）
+ */
+export function searchProducts(params: {
+  keyword: string
+  cityCode?: string
+  page?: number
+  pageSize?: number
+}): Promise<PageResult<SearchProductItem>> {
+  return post('/search/products', params)
+}
+
+/**
+ * 跑腿模板搜索（POST /search/errand-templates）
+ */
+export function searchErrandTemplates(params: {
+  keyword: string
+}): Promise<{ list: SearchErrandTemplateItem[]; total: number }> {
+  return post('/search/errand-templates', params)
+}
 
 /* ========== 首页运营位 ========== */
 export function getBanners(params?: { position?: string; cityCode?: string }): Promise<Banner[]> {

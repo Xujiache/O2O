@@ -56,11 +56,31 @@ module.exports = {
     'modules/user/jobs/**/*.ts',
     'utils/crypto.util.ts',
 
+    /* P9 Sprint 6 / W6.A.1：白名单扩张到 Sprint 3~5 新落地模块 */
+    /* Sprint 3~5 新增：notification / payment providers / orchestration processors */
+    'modules/notification/**/*.ts',
+    'modules/payment/providers/**/*.ts',
+    'modules/orchestration/processors/**/*.ts',
+    /* Sprint 4 新增：admin services / processors / interceptor */
+    'modules/admin/services/admin-export.service.ts',
+    'modules/admin/services/admin-finance-ext.service.ts',
+    'modules/admin/services/admin-rider-ext.service.ts',
+    'modules/admin/services/admin-dashboard.service.ts',
+    'modules/admin/services/operation-log.service.ts',
+    'modules/admin/processors/admin-export.processor.ts',
+    'modules/admin/operation-log.interceptor.ts',
+    /* Sprint 5 新增：rsa / log-query / amap-server */
+    'modules/admin/services/log-query.service.ts',
+    'modules/auth/services/rsa-key.service.ts',
+    'modules/auth/controllers/admin-pubkey.controller.ts',
+    'modules/map/providers/**/*.ts',
+
     /* 全局排除 */
     '!**/*.spec.ts',
     '!**/*.module.ts',
     '!**/*.dto.ts',
     '!**/*.entity.ts',
+    '!**/*.types.ts',
     '!**/index.ts'
   ],
   coverageDirectory: '../coverage'

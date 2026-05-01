@@ -24,7 +24,7 @@ import { createHash } from 'crypto'
 import type Redis from 'ioredis'
 import { Brackets, Repository, type FindOptionsWhere } from 'typeorm'
 import { BizErrorCode, BusinessException, type PageResult, makePageResult } from '@/common'
-import { Shop } from '@/entities'
+import { Product, Shop } from '@/entities'
 import { REDIS_CLIENT } from '@/health/redis.provider'
 import { haversineDistanceM, isLngLatValid } from '@/modules/map/geo.util'
 import { CryptoUtil, SnowflakeId } from '@/utils'
@@ -57,12 +57,90 @@ const SHOP_LIST_TTL_SECONDS = 120
 /** 命中后必须重置 audit_status=0 的敏感字段集合 */
 const SENSITIVE_FIELDS = ['name', 'address', 'lng', 'lat', 'contactMobile', 'industryCode'] as const
 
+/* ============================================================================
+ * 搜索 - 商品 / 跑腿模板（W6.E.1 用户端真接入）
+ * ============================================================================ */
+
+/**
+ * 搜索商品 VO（用户端）
+ * 用途：POST /search/products
+ */
+export interface SearchProductItemVo {
+  id: string
+  name: string
+  brief: string | null
+  mainImageUrl: string | null
+  price: string
+  originalPrice: string | null
+  monthlySales: number
+  score: string
+  scoreCount: number
+  shopId: string
+  shopName: string
+  shopShortName: string | null
+  shopLogoUrl: string | null
+  shopBusinessStatus: number
+}
+
+/**
+ * 搜索跑腿模板 VO（用户端）
+ * 用途：POST /search/errand-templates
+ */
+export interface SearchErrandTemplateItemVo {
+  /** service_type：1 帮送 / 2 帮取 / 3 帮买 / 4 帮排队 */
+  serviceType: 1 | 2 | 3 | 4
+  /** 模板名称 */
+  name: string
+  /** 简介 */
+  description: string
+  /** 默认起价（元，字符串） */
+  basePrice: string
+  /** 标签 */
+  tags: string[]
+}
+
+/**
+ * 跑腿模板字典（4 类 service_type 对应固定文案）
+ * 注：basePrice 仅是前端检索引导文案，真实定价以 ErrandPricingService 为准
+ */
+const ERRAND_TEMPLATE_DICT: ReadonlyArray<SearchErrandTemplateItemVo> = [
+  {
+    serviceType: 1,
+    name: '帮送',
+    description: '帮我把东西送到指定地址',
+    basePrice: '8.00',
+    tags: ['送物', '同城', '快速']
+  },
+  {
+    serviceType: 2,
+    name: '帮取',
+    description: '帮我从指定地址取东西',
+    basePrice: '8.00',
+    tags: ['取件', '快递', '代取']
+  },
+  {
+    serviceType: 3,
+    name: '帮买',
+    description: '帮我从指定商家代购物品',
+    basePrice: '12.00',
+    tags: ['代购', '超市', '药品']
+  },
+  {
+    serviceType: 4,
+    name: '帮排队',
+    description: '帮我去指定地点排队（医院/餐厅/政务）',
+    basePrice: '15.00',
+    tags: ['排队', '挂号', '取号']
+  }
+]
+
 @Injectable()
 export class ShopService {
   private readonly logger = new Logger(ShopService.name)
 
   constructor(
     @InjectRepository(Shop) private readonly shopRepo: Repository<Shop>,
+    @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly businessHourService: ShopBusinessHourService
   ) {}
@@ -358,6 +436,125 @@ export class ShopService {
     const vo = list[0]!
     await this.safeSet(cacheKey, vo, SHOP_DETAIL_TTL_SECONDS)
     return vo
+  }
+
+  /* ==========================================================================
+   * 搜索（用户端）
+   * ========================================================================== */
+
+  /**
+   * 用户端：商品搜索（LIKE 模糊匹配）
+   * 参数：keyword 关键字 / page / pageSize / cityCode（可选，过滤同城）
+   * 返回值：PageResult<SearchProductItemVo>
+   * 用途：POST /search/products
+   *
+   * 设计：
+   *   - product.status=1 上架 + audit_status=1 审核通过 + is_deleted=0
+   *   - 关联 shop（仅 status=1 + audit_status=1 + 可选 city_code 同城）
+   *   - LIKE：name OR brief
+   *   - 排序：score DESC, monthly_sales DESC, id DESC（结合 idx_shop_recommend 局部命中；
+   *           无 keyword 时退化为整表 N 范围扫，故强制 keyword 必填）
+   */
+  async searchProducts(query: {
+    keyword: string
+    cityCode?: string
+    page?: number
+    pageSize?: number
+  }): Promise<PageResult<SearchProductItemVo>> {
+    const page = query.page ?? 1
+    const pageSize = query.pageSize ?? 20
+    const kw = query.keyword.trim()
+    if (!kw) {
+      return makePageResult([], 0, page, pageSize)
+    }
+
+    const qb = this.productRepo
+      .createQueryBuilder('p')
+      .innerJoin(Shop, 's', 's.id = p.shop_id')
+      .where('p.is_deleted = 0')
+      .andWhere('p.status = 1')
+      .andWhere('p.audit_status = 1')
+      .andWhere('s.is_deleted = 0')
+      .andWhere('s.status = 1')
+      .andWhere('s.audit_status = 1')
+      .andWhere(
+        new Brackets((sub) => {
+          sub
+            .where('p.name LIKE :kw', { kw: `%${kw}%` })
+            .orWhere('p.brief LIKE :kw', { kw: `%${kw}%` })
+        })
+      )
+
+    if (query.cityCode) {
+      qb.andWhere('s.city_code = :cc', { cc: query.cityCode })
+    }
+
+    qb.orderBy('p.score', 'DESC')
+      .addOrderBy('p.monthly_sales', 'DESC')
+      .addOrderBy('p.id', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+
+    /* 同时取 product 字段 + shop.name（DTO 需要） */
+    qb.addSelect(['s.id', 's.name', 's.short_name', 's.logo_url', 's.business_status'])
+
+    const [rows, total] = await qb.getManyAndCount()
+
+    /* shopId → 简要信息批量取 */
+    const shopIds = Array.from(new Set(rows.map((p) => p.shopId)))
+    const shopMap = new Map<string, Shop>()
+    if (shopIds.length > 0) {
+      const shops = await this.shopRepo.find({
+        where: shopIds.map((id) => ({ id, isDeleted: 0 })),
+        select: ['id', 'name', 'shortName', 'logoUrl', 'businessStatus']
+      })
+      for (const s of shops) shopMap.set(s.id, s)
+    }
+
+    const list: SearchProductItemVo[] = rows.map((p) => {
+      const shop = shopMap.get(p.shopId)
+      return {
+        id: p.id,
+        name: p.name,
+        brief: p.brief,
+        mainImageUrl: p.mainImageUrl,
+        price: p.price,
+        originalPrice: p.originalPrice,
+        monthlySales: p.monthlySales,
+        score: this.scoreToString(p.score),
+        scoreCount: p.scoreCount,
+        shopId: p.shopId,
+        shopName: shop?.name ?? '',
+        shopShortName: shop?.shortName ?? null,
+        shopLogoUrl: shop?.logoUrl ?? null,
+        shopBusinessStatus: shop?.businessStatus ?? 0
+      }
+    })
+    return makePageResult(list, total, page, pageSize)
+  }
+
+  /**
+   * 用户端：跑腿模板搜索
+   *
+   * 跑腿无独立模板表（service_type 1/2/3/4 为枚举），本端口返回静态模板
+   * 用 keyword 做内存级 LIKE 匹配；未来可拓展为 sys_dict 配置化。
+   *
+   * 参数：keyword
+   * 返回值：SearchErrandTemplateItemVo[]
+   * 用途：POST /search/errand-templates
+   */
+  async searchErrandTemplates(query: {
+    keyword: string
+  }): Promise<{ list: SearchErrandTemplateItemVo[]; total: number }> {
+    const kw = query.keyword.trim().toLowerCase()
+    if (!kw) {
+      return { list: [], total: 0 }
+    }
+    const filtered = ERRAND_TEMPLATE_DICT.filter((t) => {
+      const text = `${t.name}${t.description}${t.tags.join('')}`.toLowerCase()
+      return text.includes(kw)
+    })
+    return { list: filtered, total: filtered.length }
   }
 
   /* ==========================================================================

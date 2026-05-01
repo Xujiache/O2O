@@ -47,6 +47,27 @@ const EDIT_WINDOW_MS = REVIEW_EDIT_WINDOW_HOURS * 60 * 60 * 1000
 /** 15 days 毫秒数 */
 const VALID_PERIOD_MS = REVIEW_VALID_DAYS * 24 * 60 * 60 * 1000
 
+/**
+ * GET /me/reviews/tags 返回的默认兜底标签
+ * 用途：用户尚无历史评价 / DB 故障时退化默认值（覆盖好评 + 中差评共 8 个）
+ */
+const DEFAULT_REVIEW_TAGS: ReadonlyArray<string> = [
+  '味道很赞',
+  '分量足',
+  '包装精美',
+  '配送很快',
+  '服务热情',
+  '性价比高',
+  '味道一般',
+  '送达较慢'
+]
+
+/** /me/reviews/tags 取用户历史评价的扫描上限（防 N+1 / OOM） */
+const REVIEW_TAGS_SCAN_LIMIT = 200
+
+/** /me/reviews/tags 默认返回 Top N */
+const REVIEW_TAGS_TOP_N = 8
+
 @Injectable()
 export class ReviewService {
   private readonly logger = new Logger(ReviewService.name)
@@ -192,6 +213,71 @@ export class ReviewService {
     if (query.targetType !== undefined) where.targetType = query.targetType
     if (query.orderNo) where.orderNo = query.orderNo
     return this.queryWithCommon(where, query, 'user')
+  }
+
+  /**
+   * 用户端：评价标签字典
+   * 参数：userId 当前用户（用于聚合个性化历史标签 Top N）
+   * 返回值：标签字符串数组（去重）
+   * 用途：GET /me/reviews/tags
+   *
+   * 设计：
+   *   1. 从 review 表取该用户最近 REVIEW_TAGS_SCAN_LIMIT 条评价的 tags（json 数组）
+   *   2. 拍平 + 词频 desc 排序 + 去重，取前 REVIEW_TAGS_TOP_N
+   *   3. 不足 REVIEW_TAGS_TOP_N 时按顺序补足 DEFAULT_REVIEW_TAGS
+   *   4. 任意 DB 异常 → 返回 DEFAULT_REVIEW_TAGS（best-effort，非阻塞主链路）
+   */
+  async listTags(userId: string): Promise<string[]> {
+    let rows: Array<Pick<Review, 'tags'>> = []
+    try {
+      rows = await this.reviewRepo.find({
+        where: { userId, isDeleted: 0 },
+        select: ['tags'],
+        order: { createdAt: 'DESC' },
+        take: REVIEW_TAGS_SCAN_LIMIT
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      this.logger.warn(`listTags 查询失败 userId=${userId}：${msg}`)
+      return [...DEFAULT_REVIEW_TAGS]
+    }
+
+    /* 词频统计 */
+    const counter = new Map<string, number>()
+    for (const r of rows) {
+      const tags = r.tags
+      if (!Array.isArray(tags)) continue
+      for (const t of tags) {
+        if (typeof t !== 'string') continue
+        const trimmed = t.trim()
+        if (!trimmed) continue
+        counter.set(trimmed, (counter.get(trimmed) ?? 0) + 1)
+      }
+    }
+
+    /* 词频 desc 排序后取 Top N */
+    const sorted = Array.from(counter.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map((entry) => entry[0])
+
+    /* 不足 Top N 用 DEFAULT 补齐（去重） */
+    const merged: string[] = []
+    const seen = new Set<string>()
+    for (const tag of sorted) {
+      if (merged.length >= REVIEW_TAGS_TOP_N) break
+      if (seen.has(tag)) continue
+      seen.add(tag)
+      merged.push(tag)
+    }
+    if (merged.length < REVIEW_TAGS_TOP_N) {
+      for (const tag of DEFAULT_REVIEW_TAGS) {
+        if (merged.length >= REVIEW_TAGS_TOP_N) break
+        if (seen.has(tag)) continue
+        seen.add(tag)
+        merged.push(tag)
+      }
+    }
+    return merged
   }
 
   /**

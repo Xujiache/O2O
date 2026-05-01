@@ -38,6 +38,8 @@ import { SysConfigModule } from './modules/system/sys-config.module'
 import { SentryModule } from './modules/sentry/sentry.module'
 /* P9 Sprint 5：通知统一模块（jpush / sms / wx-subscribe / axn + push token 注册） */
 import { NotificationModule } from './modules/notification/notification.module'
+/* P9 Sprint 6：实时推送 Gateway（4 namespace + JWT 鉴权） */
+import { RealtimeModule } from './modules/realtime/realtime.module'
 
 /**
  * 根模块
@@ -84,7 +86,9 @@ import { NotificationModule } from './modules/notification/notification.module'
     CustomerModule,
     SysConfigModule,
     /* P9 Sprint 5 / W5：通知 + 推送 token */
-    NotificationModule
+    NotificationModule,
+    /* P9 Sprint 6 / W6.B：实时推送 Gateway */
+    RealtimeModule
   ],
   providers: [
     /* 全局 JWT 鉴权守卫：默认拦截所有路由，@Public() 装饰的除外 */

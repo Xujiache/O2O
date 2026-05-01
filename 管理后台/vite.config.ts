@@ -169,20 +169,21 @@ export default ({ mode }: { mode: string }) => {
       // }),
     ],
     // 依赖预构建：避免运行时重复请求与转换，提升首次加载速度
+    // P9 Sprint 6 W6.D：
+    //   - 移除 'xlsx' 显式 include —— art-excel-export/import 改为 await import('xlsx')，
+    //     交给 esbuild 仅在调用时按需打入独立 chunk（vendor-xlsx 不再进入首屏 modulepreload）。
+    //   - 移除 'element-plus/es' 显式 include —— ElementPlusResolver 已经按 import 自动按需，
+    //     强制预构建反而把所有子模块拉进首屏依赖图，违反按需引入。
     optimizeDeps: {
       include: [
         'echarts/core',
         'echarts/charts',
         'echarts/components',
         'echarts/renderers',
-        'xlsx',
         'xgplayer',
         'crypto-js',
         'file-saver',
-        'vue-img-cutter',
-        'element-plus/es',
-        'element-plus/es/components/*/style/css',
-        'element-plus/es/components/*/style/index'
+        'vue-img-cutter'
       ]
     },
     css: {

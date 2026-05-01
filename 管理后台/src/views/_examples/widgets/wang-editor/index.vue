@@ -211,6 +211,13 @@
 </template>
 
 <script setup lang="ts">
+  // P9 Sprint 6 W6.D.2：路由级懒加载 — wangEditor 重型依赖（≈800KB）改为异步组件
+  // 仅在本页真正挂载时才下载 vendor-wangeditor chunk；本地绑定优先级高于 unplugin 自动导入
+  import { defineAsyncComponent } from 'vue'
+  const ArtWangEditor = defineAsyncComponent(
+    () => import('@/components/core/forms/art-wang-editor/index.vue')
+  )
+
   defineOptions({ name: 'WidgetsWangEditor' })
 
   const fullEditorRef = ref()

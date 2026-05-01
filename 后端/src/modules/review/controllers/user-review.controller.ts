@@ -109,6 +109,23 @@ export class UserReviewController {
     return this.reviewService.listForUser(userId, query)
   }
 
+  /**
+   * 评价标签字典（提交评价页使用）
+   * 路径：GET /me/reviews/tags
+   *
+   * 行为：
+   *   - 聚合该用户历史评价 tags（最近 200 条）取词频 Top N
+   *   - 不足 8 个用 DEFAULT 兜底；DB 故障也降级到 DEFAULT，不阻塞主链路
+   */
+  @Get('me/reviews/tags')
+  @ApiOperation({
+    summary: '评价标签字典（用户历史 Top N + 默认兜底；前端在评价提交页使用）'
+  })
+  @ApiSwaggerResponse({ status: 200, type: String, isArray: true })
+  listReviewTags(@CurrentUser('uid') userId: string): Promise<string[]> {
+    return this.reviewService.listTags(userId)
+  }
+
   /* ==========================================================================
    * 二、售后
    * ========================================================================== */

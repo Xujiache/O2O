@@ -76,6 +76,13 @@
 </template>
 
 <script setup lang="ts">
+  // P9 Sprint 6 W6.D.2：路由级懒加载 — wangEditor 重型依赖（≈800KB）改为异步组件
+  // 仅在本页真正挂载（用户进入文章发布页）时才下载 vendor-wangeditor chunk
+  import { defineAsyncComponent } from 'vue'
+  const ArtWangEditor = defineAsyncComponent(
+    () => import('@/components/core/forms/art-wang-editor/index.vue')
+  )
+
   import { Plus } from '@element-plus/icons-vue'
   import { ApiStatus } from '@/utils/http/status'
   import { useUserStore } from '@/store/modules/user'

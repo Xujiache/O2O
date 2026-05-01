@@ -4,6 +4,20 @@
       <text>每天可设置多个时段；点击「复制到其他天」批量同步</text>
     </view>
 
+    <!-- W6.E.4：当前营业状态（由后端 cron 每分钟根据 business_hours 自动切换） -->
+    <view class="bh-status">
+      <view class="bh-status__row">
+        <text class="bh-status__label">当前营业状态</text>
+        <view class="bh-status__value" :class="`bh-status__value--${currentStatus}`">
+          <view class="bh-status__dot" />
+          <text>{{ currentStatusText }}</text>
+        </view>
+      </view>
+      <text class="bh-status__hint">
+        系统每分钟按下方营业时段自动切换；如需手动「临时歇业」，请前往店铺设置页
+      </text>
+    </view>
+
     <view class="bh-list">
       <view v-for="(d, dIdx) in days" :key="d.weekday" class="bh-day">
         <view class="bh-day__header row-between">
@@ -56,10 +70,10 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
+  import { ref, computed, onMounted } from 'vue'
   import { useShopStore } from '@/store'
   import type { BusinessHourDay } from '@/types/biz'
-  import { getBusinessHours, setBusinessHours } from '@/api/shop'
+  import { getBusinessHours, getShopDetail, setBusinessHours } from '@/api/shop'
   import { mockEnabled, delay } from '@/api/_mock'
   import { logger } from '@/utils/logger'
 
@@ -76,6 +90,19 @@
   const submitting = ref<boolean>(false)
   const days = ref<BusinessHourDay[]>([])
 
+  /**
+   * 当前 business_status（由后端 cron 决定）
+   *   0 打烊 / 1 营业 / 2 临时歇业
+   */
+  const currentStatus = ref<0 | 1 | 2>(0)
+
+  /** 状态文案 */
+  const currentStatusText = computed<string>(() => {
+    if (currentStatus.value === 1) return '营业中'
+    if (currentStatus.value === 2) return '临时歇业'
+    return '已打烊'
+  })
+
   onMounted(async () => {
     if (!shopStore.currentShopId) {
       uni.showToast({ title: '请先选择店铺', icon: 'none' })
@@ -90,6 +117,16 @@
     } catch (e) {
       logger.warn('bh.load.fail', { e: String(e) })
       days.value = genDefault()
+    }
+    /* W6.E.4：拉取店铺详情同步 cron 当前 business_status */
+    if (!mockEnabled()) {
+      try {
+        const detail = await getShopDetail(shopStore.currentShopId)
+        const s = (detail as { businessStatus?: number; isOpen?: number }).businessStatus
+        if (s === 0 || s === 1 || s === 2) currentStatus.value = s
+      } catch (e) {
+        logger.warn('bh.status.load.fail', { e: String(e) })
+      }
     }
   })
 
@@ -201,6 +238,63 @@
     color: $uni-color-primary;
     background: $uni-color-primary-light;
     border-radius: $uni-border-radius-base;
+  }
+
+  .bh-status {
+    padding: 24rpx;
+    margin-bottom: 16rpx;
+    background: #fff;
+    border-radius: 16rpx;
+
+    &__row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12rpx;
+    }
+
+    &__label {
+      font-size: 28rpx;
+      font-weight: 500;
+      color: $uni-text-color;
+    }
+
+    &__value {
+      display: flex;
+      gap: 8rpx;
+      align-items: center;
+      padding: 4rpx 16rpx;
+      font-size: 24rpx;
+      border-radius: 999rpx;
+
+      &--0 {
+        color: $uni-text-color-grey;
+        background: $uni-bg-color-grey;
+      }
+
+      &--1 {
+        color: #fff;
+        background: $uni-color-success;
+      }
+
+      &--2 {
+        color: #fff;
+        background: $uni-color-warning;
+      }
+    }
+
+    &__dot {
+      width: 12rpx;
+      height: 12rpx;
+      background: currentColor;
+      border-radius: 50%;
+    }
+
+    &__hint {
+      display: block;
+      font-size: 22rpx;
+      color: $uni-text-color-grey;
+    }
   }
 
   .bh-day {

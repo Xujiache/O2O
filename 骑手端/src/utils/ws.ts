@@ -1,7 +1,7 @@
 /**
  * @file ws.ts
- * @stage P7/T7.2 (Sprint 1)
- * @desc WebSocket 客户端封装：心跳 30s + 断线重连（指数退避，最多 5 次） + topic 订阅
+ * @stage P7/T7.2 → P9/Sprint 6 W6.B.2（接通后端 RealtimeGateway 真实地址）
+ * @desc WebSocket 客户端封装：心跳 30s + 断线重连（指数退避 2/5/10/30s 上限） + topic 订阅
  *
  * 骑手端 topic（DESIGN_P7 §3.3 派单交互 + 提示词 §4.4 约定）：
  *   - rider:dispatch:new                  系统派单（核心，触发 DispatchModal 弹层）
@@ -57,23 +57,28 @@ class WsClient {
   private state: WsState = 'idle'
   private url = ''
   private heartbeatMs = 30_000
-  private maxReconnect = 5
-  private reconnectBaseMs = 1000
+  /** 重连无上限次数；延迟阶梯 2s/5s/10s/30s（30s 上限） */
+  private reconnectDelays = [2_000, 5_000, 10_000, 30_000]
   private reconnectMaxMs = 30_000
   private reconnectCount = 0
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private handlers: Map<string, Set<WsHandler>> = new Map()
   private manuallyClosed = false
+  private enabled = true
 
   /**
    * 连接 WebSocket
-   * @param opt 配置（url 必填）
+   * @param opt 配置（url 必填，为空则禁用）
    */
   connect(opt: WsOptions): void {
+    if (!opt.url) {
+      this.enabled = false
+      console.warn('[ws.init.skip] empty VITE_WS_URL')
+      return
+    }
+    this.enabled = true
     this.url = opt.url
     if (opt.heartbeatMs) this.heartbeatMs = opt.heartbeatMs
-    if (opt.maxReconnect) this.maxReconnect = opt.maxReconnect
-    if (opt.reconnectBaseMs) this.reconnectBaseMs = opt.reconnectBaseMs
     if (opt.reconnectMaxMs) this.reconnectMaxMs = opt.reconnectMaxMs
     this.manuallyClosed = false
     this.open()
@@ -81,10 +86,14 @@ class WsClient {
 
   /** 真正建链 */
   private open(): void {
+    if (!this.enabled) return
     if (this.state === 'open' || this.state === 'connecting') return
     this.state = 'connecting'
     const token = getStorage<string>(STORAGE_KEYS.TOKEN)
-    const finalUrl = token ? `${this.url}?token=${encodeURIComponent(token)}` : this.url
+    const sep = this.url.includes('?') ? '&' : '?'
+    const finalUrl = token
+      ? `${this.url}${sep}auth=${encodeURIComponent(token)}&token=${encodeURIComponent(token)}`
+      : this.url
     try {
       this.socket = uni.connectSocket({
         url: finalUrl,
@@ -149,13 +158,11 @@ class WsClient {
     }
   }
 
-  /** 重连调度 */
+  /** 重连调度（指数退避：2s / 5s / 10s / 30s 上限，无次数上限） */
   private scheduleReconnect(): void {
-    if (this.reconnectCount >= this.maxReconnect) {
-      logger.warn('ws.reconnect.exceeded', { count: this.reconnectCount })
-      return
-    }
-    const delay = Math.min(this.reconnectBaseMs * 2 ** this.reconnectCount, this.reconnectMaxMs)
+    if (!this.enabled || this.manuallyClosed) return
+    const idx = Math.min(this.reconnectCount, this.reconnectDelays.length - 1)
+    const delay = Math.min(this.reconnectDelays[idx], this.reconnectMaxMs)
     this.reconnectCount += 1
     logger.info('ws.reconnect.schedule', { delayMs: delay, attempt: this.reconnectCount })
     setTimeout(() => {
@@ -179,20 +186,43 @@ class WsClient {
   }
 
   /**
-   * 订阅事件
-   * @param topic 事件主题
-   * @param handler 回调
-   * @returns 取消订阅函数
+   * 订阅事件（兼容 2 种签名）
+   *   - subscribe(topic, handler) → 本地注册 + 上行（向后兼容）
+   *   - subscribe(topic)          → 仅上行（W6.B.2 新签名）
    */
-  subscribe<T = unknown>(topic: RiderWsTopic | string, handler: WsHandler<T>): () => void {
+  subscribe<T = unknown>(topic: RiderWsTopic | string, handler?: WsHandler<T>): () => void {
+    this.sendUpstream('subscribe', topic)
+    if (!handler) return () => this.sendUpstream('unsubscribe', topic)
     if (!this.handlers.has(topic)) this.handlers.set(topic, new Set())
     this.handlers.get(topic)?.add(handler as WsHandler)
     return () => this.unsubscribe(topic, handler)
   }
 
-  /** 取消订阅 */
-  unsubscribe<T = unknown>(topic: RiderWsTopic | string, handler: WsHandler<T>): void {
-    this.handlers.get(topic)?.delete(handler as WsHandler)
+  /** 取消订阅（handler 可选） */
+  unsubscribe<T = unknown>(topic: RiderWsTopic | string, handler?: WsHandler<T>): void {
+    this.sendUpstream('unsubscribe', topic)
+    if (handler) this.handlers.get(topic)?.delete(handler as WsHandler)
+  }
+
+  /**
+   * 注册事件监听器（W6.B.2：本地订阅，不发上行）
+   */
+  on<T = unknown>(topic: RiderWsTopic | string, handler: WsHandler<T>): () => void {
+    if (!this.handlers.has(topic)) this.handlers.set(topic, new Set())
+    this.handlers.get(topic)?.add(handler as WsHandler)
+    return () => {
+      this.handlers.get(topic)?.delete(handler as WsHandler)
+    }
+  }
+
+  /** 发送上行控制帧 */
+  private sendUpstream(event: string, topic: RiderWsTopic | string): void {
+    if (this.state !== 'open' || !this.socket) return
+    try {
+      this.socket.send({ data: JSON.stringify({ event, topic }) })
+    } catch (e) {
+      logger.warn('ws.upstream.fail', { event, topic, e: String(e) })
+    }
   }
 
   /** 派发事件到订阅者 */
@@ -217,27 +247,26 @@ class WsClient {
 /** 全局单例 */
 export const ws = new WsClient()
 
-/** 读取 env 配置 */
+/** 读取 env 配置（优先 VITE_WS_URL，向后兼容 VITE_WS_BASE_URL） */
 function getWsBaseUrl(): string {
   const env = (import.meta as unknown as { env?: Record<string, string> }).env
-  return env?.VITE_WS_BASE_URL ?? 'ws://localhost:3000/ws'
+  return env?.VITE_WS_URL ?? env?.VITE_WS_BASE_URL ?? ''
 }
 
 /**
  * 启动 WebSocket（按需调用，例如登录后或开始接单时）
- * @param riderId 当前骑手 ID（拼接 path）
+ * @param riderId 当前骑手 ID（仅做调试，身份认证由 JWT 携带）
  */
 export function startWs(riderId?: string | number): void {
   if (ws.isOpen()) return
   const base = getWsBaseUrl()
-  const path = riderId ? `/rider/${riderId}` : '/rider'
-  ws.connect({
-    url: `${base}${path}`,
-    heartbeatMs: 30_000,
-    maxReconnect: 5,
-    reconnectBaseMs: 1000,
-    reconnectMaxMs: 30_000
-  })
+  if (!base) {
+    console.warn('[ws.start.skip] empty VITE_WS_URL')
+    ws.connect({ url: '', heartbeatMs: 30_000, reconnectMaxMs: 30_000 })
+    return
+  }
+  const url = `${base}/rider${riderId !== undefined ? `?riderId=${encodeURIComponent(String(riderId))}` : ''}`
+  ws.connect({ url, heartbeatMs: 30_000, reconnectMaxMs: 30_000 })
 }
 
 /** 关闭 WebSocket（应用进入后台或登出） */

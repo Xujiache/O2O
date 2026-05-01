@@ -8,6 +8,9 @@ import { defineConfig, devices } from '@playwright/test'
  * Sprint 3（W3.E.1）追加 5 个独立 project：user / product / marketing / review / cs-risk
  *   - 各自独立 testMatch（fixture mock 后端，不挂 webServer）
  *   - 共用 Desktop Chrome 上下文
+ *
+ * Sprint 6（W6.C）追加 1 个 permission project：tests/permission/**
+ *   - 5 角色 × 6 模块越权矩阵（fixture mock 登录 + perm storage）
  */
 export default defineConfig({
   testDir: './tests',
@@ -64,6 +67,12 @@ export default defineConfig({
     {
       name: 'cs-risk',
       testMatch: /cs-risk\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] }
+    },
+    /* ===== Sprint 6 / W6.C - 5 角色 × 6 模块权限越权矩阵 ===== */
+    {
+      name: 'permission',
+      testMatch: 'tests/permission/**/*.spec.ts',
       use: { ...devices['Desktop Chrome'] }
     }
   ]

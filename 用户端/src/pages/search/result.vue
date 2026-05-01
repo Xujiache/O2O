@@ -27,18 +27,12 @@
     </view>
 
     <scroll-view scroll-y class="result__scroll" @scrolltolower="onScrollToLower">
-      <BizLoading v-if="loading && list.length === 0" text="搜索中..." />
-      <BizError
-        v-else-if="error && list.length === 0"
-        title="搜索失败"
-        desc="请稍后重试"
-        @retry="reload"
-      />
-      <BizEmpty
-        v-else-if="!loading && list.length === 0"
-        :text="`未找到与「${q}」相关的${currentTabName}`"
-      />
-      <view v-else class="result__list">
+      <BizLoading v-if="loading && isEmpty" text="搜索中..." />
+      <BizError v-else-if="error && isEmpty" title="搜索失败" desc="请稍后重试" @retry="reload" />
+      <BizEmpty v-else-if="!loading && isEmpty" :text="`未找到与「${q}」相关的${currentTabName}`" />
+
+      <!-- 店铺 -->
+      <view v-else-if="currentTabType === 'shop'" class="result__list">
         <view
           v-for="shop in list"
           :key="shop.id"
@@ -86,6 +80,86 @@
           </view>
         </view>
       </view>
+
+      <!-- 商品 -->
+      <view v-else-if="currentTabType === 'product'" class="result__list">
+        <view
+          v-for="item in productList"
+          :key="item.id"
+          class="result__card card"
+          @tap="onProductClick(item)"
+        >
+          <image
+            class="result__cover"
+            :src="item.mainImageUrl || PLACEHOLDER_IMG"
+            mode="aspectFill"
+            lazy-load
+          />
+          <view class="result__body">
+            <view class="result__title-row">
+              <view class="result__name u-line-1">
+                <text v-for="(seg, i) in highlight(item.name)" :key="i" :class="seg.cls">
+                  {{ seg.text }}
+                </text>
+              </view>
+            </view>
+            <view class="result__meta-row">
+              <text class="result__shop-name u-line-1">{{ item.shopName }}</text>
+              <text v-if="item.score" class="result__score">★ {{ item.score }}</text>
+            </view>
+            <view class="result__fee-row">
+              <text class="result__price">¥ {{ formatAmount(item.price) }}</text>
+              <text class="result__divider">·</text>
+              <text>月售 {{ item.monthlySales }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="result__footer">
+          <view v-if="loading">
+            <text class="result__footer-text">加载中...</text>
+          </view>
+          <view v-else-if="hasMore" class="result__loadmore" @tap="loadMore">
+            <text class="result__footer-text">加载更多</text>
+          </view>
+          <view v-else>
+            <text class="result__footer-text">— 没有更多了 —</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 跑腿模板 -->
+      <view v-else-if="currentTabType === 'errand'" class="result__list">
+        <view
+          v-for="tpl in errandList"
+          :key="tpl.serviceType"
+          class="result__card card"
+          @tap="onErrandClick(tpl)"
+        >
+          <view class="result__errand-icon">
+            <text>{{ tpl.name }}</text>
+          </view>
+          <view class="result__body">
+            <view class="result__title-row">
+              <view class="result__name u-line-1">
+                <text v-for="(seg, i) in highlight(tpl.name)" :key="i" :class="seg.cls">
+                  {{ seg.text }}
+                </text>
+              </view>
+              <text class="result__price">起 {{ formatAmount(tpl.basePrice) }}</text>
+            </view>
+            <view class="result__fee-row">
+              <text class="u-line-1">{{ tpl.description }}</text>
+            </view>
+            <view class="result__meta-row">
+              <text v-for="t in tpl.tags" :key="t" class="result__tag">{{ t }}</text>
+            </view>
+          </view>
+        </view>
+        <view class="result__footer">
+          <text class="result__footer-text">— 跑腿模板共 {{ errandList.length }} 项 —</text>
+        </view>
+      </view>
     </scroll-view>
   </view>
 </template>
@@ -102,7 +176,14 @@
   import BizLoading from '@/components/biz/BizLoading.vue'
   import BizEmpty from '@/components/biz/BizEmpty.vue'
   import BizError from '@/components/biz/BizError.vue'
-  import { listShops, type ShopListParams } from '@/api/shop'
+  import {
+    listShops,
+    searchProducts,
+    searchErrandTemplates,
+    type ShopListParams,
+    type SearchProductItem,
+    type SearchErrandTemplateItem
+  } from '@/api/shop'
   import type { Shop, KeysetPageResult, PageResult } from '@/types/biz'
   import { useLocationStore } from '@/store/location'
   import { formatAmount, formatDistance } from '@/utils/format'
@@ -126,6 +207,8 @@
   const q = ref<string>('')
   const activeTabIdx = ref<number>(0)
   const list = ref<Shop[]>([])
+  const productList = ref<SearchProductItem[]>([])
+  const errandList = ref<SearchErrandTemplateItem[]>([])
   const cursor = ref<string | null>(null)
   const page = ref<number>(1)
   const hasMore = ref<boolean>(true)
@@ -134,6 +217,15 @@
 
   /** 当前 Tab 名（用于空态文案） */
   const currentTabName = computed<string>(() => tabs.value[activeTabIdx.value]?.name ?? '结果')
+  /** 当前 Tab type */
+  const currentTabType = computed<ResultType>(() => tabs.value[activeTabIdx.value]?.type ?? 'shop')
+
+  /** 当前 Tab 列表是否为空 */
+  const isEmpty = computed<boolean>(() => {
+    if (currentTabType.value === 'shop') return list.value.length === 0
+    if (currentTabType.value === 'product') return productList.value.length === 0
+    return errandList.value.length === 0
+  })
 
   onLoad((options) => {
     const param = options ?? {}
@@ -166,6 +258,8 @@
    */
   async function reload(): Promise<void> {
     list.value = []
+    productList.value = []
+    errandList.value = []
     cursor.value = null
     page.value = 1
     hasMore.value = true
@@ -184,36 +278,74 @@
 
   /**
    * 拉取一页结果
-   * 当前 product/errand 后端接口未导出对应方法，统一走 listShops 兜底
-   * （由 Cascade 后续 Sprint 替换为真实接口；不阻塞 V5.2 keyset 分页验收）
+   * 三种 Tab 各自走真实后端接口：
+   *   - shop:    listShops (GET /user/shops)
+   *   - product: searchProducts (POST /search/products) — W6.E.1 真接入
+   *   - errand:  searchErrandTemplates (POST /search/errand-templates) — W6.E.1 真接入
    */
   async function fetchPage(): Promise<void> {
     if (loading.value) return
     loading.value = true
     error.value = false
     try {
-      const params: ShopListParams = {
-        q: q.value,
-        cityCode: locationStore.city?.cityCode,
-        lng: locationStore.coord?.lng,
-        lat: locationStore.coord?.lat,
-        page: page.value,
-        pageSize: PAGE_SIZE,
-        cursor: cursor.value ?? undefined
-      }
-      const r = await listShops(params)
-      const items = extractList(r)
-      list.value = page.value === 1 ? items : [...list.value, ...items]
-      hasMore.value = computeHasMore(r, items.length)
-      if ('nextCursor' in r) {
-        cursor.value = r.nextCursor ?? null
+      const tabType = currentTabType.value
+      if (tabType === 'shop') {
+        await fetchShopPage()
+      } else if (tabType === 'product') {
+        await fetchProductPage()
+      } else {
+        await fetchErrandPage()
       }
     } catch (e) {
       error.value = true
-      logger.warn('search.result.fail', { e: String(e), q: q.value })
+      logger.warn('search.result.fail', { e: String(e), q: q.value, tab: currentTabType.value })
     } finally {
       loading.value = false
     }
+  }
+
+  /** 店铺 Tab */
+  async function fetchShopPage(): Promise<void> {
+    const params: ShopListParams = {
+      q: q.value,
+      cityCode: locationStore.city?.cityCode,
+      lng: locationStore.coord?.lng,
+      lat: locationStore.coord?.lat,
+      page: page.value,
+      pageSize: PAGE_SIZE,
+      cursor: cursor.value ?? undefined
+    }
+    const r = await listShops(params)
+    const items = extractList(r)
+    list.value = page.value === 1 ? items : [...list.value, ...items]
+    hasMore.value = computeHasMore(r, items.length)
+    if ('nextCursor' in r) {
+      cursor.value = r.nextCursor ?? null
+    }
+  }
+
+  /** 商品 Tab（W6.E.1 真接入） */
+  async function fetchProductPage(): Promise<void> {
+    const r = await searchProducts({
+      keyword: q.value,
+      cityCode: locationStore.city?.cityCode,
+      page: page.value,
+      pageSize: PAGE_SIZE
+    })
+    const items = Array.isArray(r?.list) ? r.list : []
+    productList.value = page.value === 1 ? items : [...productList.value, ...items]
+    if (r && r.meta && typeof r.meta.totalPages === 'number') {
+      hasMore.value = page.value < r.meta.totalPages
+    } else {
+      hasMore.value = items.length >= PAGE_SIZE
+    }
+  }
+
+  /** 跑腿 Tab（W6.E.1 真接入；模板字典一页吐完不分页） */
+  async function fetchErrandPage(): Promise<void> {
+    const r = await searchErrandTemplates({ keyword: q.value })
+    errandList.value = Array.isArray(r?.list) ? r.list : []
+    hasMore.value = false
   }
 
   /**
@@ -266,6 +398,26 @@
   function onShopClick(id: string): void {
     uni.navigateTo({
       url: `/pages-takeout/shop-detail?shopId=${encodeURIComponent(id)}`
+    })
+  }
+
+  /**
+   * 跳商品所在店铺详情（命中 highlight 商品）
+   */
+  function onProductClick(item: SearchProductItem): void {
+    track(TRACK.SEARCH_SUBMIT, { q: q.value, type: 'product', productId: item.id })
+    uni.navigateTo({
+      url: `/pages-takeout/shop-detail?shopId=${encodeURIComponent(item.shopId)}&productId=${encodeURIComponent(item.id)}`
+    })
+  }
+
+  /**
+   * 跳跑腿下单（按 service_type 默认进入对应入口）
+   */
+  function onErrandClick(tpl: SearchErrandTemplateItem): void {
+    track(TRACK.SEARCH_SUBMIT, { q: q.value, type: 'errand', serviceType: tpl.serviceType })
+    uni.navigateTo({
+      url: `/pages-errand/place-order?serviceType=${tpl.serviceType}`
     })
   }
 
@@ -455,6 +607,41 @@
       padding: 16rpx 64rpx;
       background: $color-bg-white;
       border-radius: $radius-lg;
+    }
+
+    &__shop-name {
+      flex: 1;
+      min-width: 0;
+      font-size: $font-size-sm;
+      color: $color-text-secondary;
+    }
+
+    &__price {
+      font-size: $font-size-md;
+      font-weight: $font-weight-medium;
+      color: $color-primary;
+    }
+
+    &__tag {
+      padding: 2rpx 12rpx;
+      margin-right: 8rpx;
+      font-size: $font-size-xs;
+      color: $color-text-secondary;
+      background: $color-bg-page;
+      border-radius: $radius-sm;
+    }
+
+    &__errand-icon {
+      @include flex-center;
+
+      flex-shrink: 0;
+      width: 160rpx;
+      height: 160rpx;
+      font-size: $font-size-md;
+      font-weight: $font-weight-bold;
+      color: $color-text-inverse;
+      background: linear-gradient(135deg, #ff6a1a, #ff8e53);
+      border-radius: $radius-sm;
     }
   }
 </style>

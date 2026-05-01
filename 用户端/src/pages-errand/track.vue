@@ -33,26 +33,50 @@
       </view>
     </view>
 
-    <!-- 骑手 + 取件码 -->
-    <view class="track__panel">
-      <view v-if="rider.id" class="track__rider">
-        <image class="track__rider-avatar" :src="riderAvatar" mode="aspectFill" />
-        <view class="track__rider-info">
-          <text class="track__rider-name">{{ rider.name || '配送中骑手' }}</text>
-          <text class="track__rider-meta">{{ riderMetaText }}</text>
-        </view>
-        <view class="track__rider-actions">
-          <view class="track__rider-btn" @tap="onCallRider">
-            <text>电话</text>
+    <!-- 反向高亮 Tab 条（W6.E.2：IntersectionObserver 监听各 section 进入视口） -->
+    <view class="track__tabs">
+      <view
+        v-for="sec in panelSections"
+        :key="sec.id"
+        class="track__tabs-item"
+        :class="{ 'track__tabs-item--active': activeSectionId === sec.id }"
+        @tap="onTabClick(sec.id)"
+      >
+        <text>{{ sec.label }}</text>
+      </view>
+    </view>
+
+    <!-- 骑手 + 取件码（每个 section 通过 id 被 IntersectionObserver 反向高亮） -->
+    <scroll-view
+      id="track-panel"
+      class="track__panel"
+      scroll-y
+      :scroll-into-view="scrollIntoId"
+      scroll-with-animation
+      @scroll="onPanelScroll"
+    >
+      <view id="section-rider" class="track__section">
+        <view v-if="rider.id" class="track__rider">
+          <image class="track__rider-avatar" :src="riderAvatar" mode="aspectFill" />
+          <view class="track__rider-info">
+            <text class="track__rider-name">{{ rider.name || '配送中骑手' }}</text>
+            <text class="track__rider-meta">{{ riderMetaText }}</text>
+          </view>
+          <view class="track__rider-actions">
+            <view class="track__rider-btn" @tap="onCallRider">
+              <text>电话</text>
+            </view>
           </view>
         </view>
-      </view>
-      <view v-else class="track__rider track__rider--empty">
-        <text class="track__rider-empty-text">骑手匹配中，请稍候...</text>
+        <view v-else class="track__rider track__rider--empty">
+          <text class="track__rider-empty-text">骑手匹配中，请稍候...</text>
+        </view>
       </view>
 
-      <PickupCode v-if="showPickupCode && pickupCode" :code="pickupCode" :proofs="proofImages" />
-    </view>
+      <view v-if="showPickupCode && pickupCode" id="section-pickup" class="track__section">
+        <PickupCode :code="pickupCode" :proofs="proofImages" />
+      </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -63,8 +87,8 @@
    * @desc 跑腿订单实时跟踪：地图 + WS 骑手位置（10 步插值平滑）+ 状态栏 + 取件码 + 凭证；3s 轮询兜底
    * @author 单 Agent V2.0
    */
-  import { computed, reactive, ref } from 'vue'
-  import { onLoad, onUnload, onShow, onHide } from '@dcloudio/uni-app'
+  import { computed, nextTick, reactive, ref } from 'vue'
+  import { onLoad, onUnload, onShow, onHide, onReady } from '@dcloudio/uni-app'
   import BizLoading from '@/components/biz/BizLoading.vue'
   import PickupCode from '@/components/biz/PickupCode.vue'
   import { getOrderDetail } from '@/api/order'
@@ -181,6 +205,35 @@
   /** WS 取消订阅函数（onUnload 调用） */
   let unsubLocation: (() => void) | null = null
   let unsubStatus: (() => void) | null = null
+
+  /* ========== 反向高亮 Tab（W6.E.2 IntersectionObserver） ========== */
+
+  /** 面板 section 标识（与模板 id 一致） */
+  type PanelSectionId = 'section-rider' | 'section-pickup'
+
+  /** Tab 元数据 */
+  const panelSections = computed<Array<{ id: PanelSectionId; label: string }>>(() => {
+    const list: Array<{ id: PanelSectionId; label: string }> = [
+      { id: 'section-rider', label: '骑手信息' }
+    ]
+    if (showPickupCode.value && pickupCode.value) {
+      list.push({ id: 'section-pickup', label: '取件码' })
+    }
+    return list
+  })
+
+  /** 当前激活 section（反向高亮 Tab 用） */
+  const activeSectionId = ref<PanelSectionId>('section-rider')
+  /** 点击 Tab 触发的 scroll-into-view 目标 id */
+  const scrollIntoId = ref<string>('')
+  /** 滚动停止防抖 timer */
+  let scrollDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  /** 滚动期间忽略 IntersectionObserver 自动激活（防点击 Tab 时被回滚覆盖） */
+  let suppressObserverUntil = 0
+  /** 各 section 的可见率（最大可见 section 即激活） */
+  const sectionVisibleRatio = new Map<PanelSectionId, number>()
+  /** 已创建的 IntersectionObserver 列表（onUnload 时 disconnect） */
+  let panelObservers: Array<{ disconnect: () => void }> = []
 
   /* ========== computed ========== */
 
@@ -316,6 +369,11 @@
     if (orderNo.value && orderDetail.value) {
       void refreshOrder()
     }
+  })
+
+  onReady(() => {
+    /* DOM 渲染完成后挂 IntersectionObserver（uni-app 真机 + h5 双端可用） */
+    void nextTick(() => setupPanelObservers())
   })
 
   onHide(() => {
@@ -593,12 +651,100 @@
     })
   }
 
+  /* ========== 反向高亮（IntersectionObserver） ========== */
+
+  /**
+   * 为每个 section 注册 IntersectionObserver
+   * 设计：
+   *   - 不同 section 各注册 1 个 observer，避免观察列表混淆
+   *   - relativeTo('#track-panel') —— 以面板容器为参考系
+   *   - threshold = [0.0, 0.25, 0.5, 0.75, 1.0] —— 5 阶梯量化可见率
+   *   - 每次回调记录 intersectionRatio；computeActive 取「最大可见 section」激活
+   */
+  function setupPanelObservers(): void {
+    teardownPanelObservers()
+    const ids: PanelSectionId[] = ['section-rider', 'section-pickup']
+    for (const sid of ids) {
+      try {
+        const obs = uni
+          .createIntersectionObserver(undefined, {
+            thresholds: [0, 0.25, 0.5, 0.75, 1.0]
+          })
+          .relativeTo('#track-panel')
+        obs.observe(`#${sid}`, (res: { intersectionRatio?: number }) => {
+          const ratio = typeof res?.intersectionRatio === 'number' ? res.intersectionRatio : 0
+          sectionVisibleRatio.set(sid, ratio)
+          /* 滚动停止后再次评估激活；点击 Tab 触发的滚动期间静音 */
+          if (Date.now() < suppressObserverUntil) return
+          recomputeActiveSection()
+        })
+        panelObservers.push(obs as unknown as { disconnect: () => void })
+      } catch (e) {
+        logger.warn('errand.track.observer.setup.fail', { sid, e: String(e) })
+      }
+    }
+  }
+
+  /** 释放所有 IntersectionObserver */
+  function teardownPanelObservers(): void {
+    for (const obs of panelObservers) {
+      try {
+        obs.disconnect()
+      } catch {
+        /* 忽略 disconnect 异常 */
+      }
+    }
+    panelObservers = []
+    sectionVisibleRatio.clear()
+  }
+
+  /** 取最大可见率 section 作为 active */
+  function recomputeActiveSection(): void {
+    let maxRatio = -1
+    let candidate: PanelSectionId | null = null
+    for (const sec of panelSections.value) {
+      const r = sectionVisibleRatio.get(sec.id) ?? 0
+      if (r > maxRatio) {
+        maxRatio = r
+        candidate = sec.id
+      }
+    }
+    if (candidate && candidate !== activeSectionId.value && maxRatio > 0.1) {
+      activeSectionId.value = candidate
+    }
+  }
+
+  /** 滚动事件：节流防抖确认最大可见 */
+  function onPanelScroll(): void {
+    if (scrollDebounceTimer) clearTimeout(scrollDebounceTimer)
+    scrollDebounceTimer = setTimeout(() => {
+      if (Date.now() < suppressObserverUntil) return
+      recomputeActiveSection()
+    }, 80)
+  }
+
+  /** Tab 点击 → scroll-into-view 跳转到对应 section */
+  function onTabClick(id: PanelSectionId): void {
+    activeSectionId.value = id
+    scrollIntoId.value = ''
+    /* 静音 1.5s，等待动画完成；防止 observer 在滚动中途反向覆盖 */
+    suppressObserverUntil = Date.now() + 1500
+    void nextTick(() => {
+      scrollIntoId.value = id
+    })
+  }
+
   /* ========== 清理 ========== */
 
   function cleanup() {
     stopInterpolation()
     stopCountdown()
     stopPolling()
+    teardownPanelObservers()
+    if (scrollDebounceTimer) {
+      clearTimeout(scrollDebounceTimer)
+      scrollDebounceTimer = null
+    }
     if (unsubLocation) {
       unsubLocation()
       unsubLocation = null
@@ -675,6 +821,32 @@
       background: $color-bg-page;
     }
 
+    &__tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 24rpx;
+      background: $color-bg-white;
+      border-top: 1rpx solid $color-divider;
+    }
+
+    &__tabs-item {
+      flex: 1;
+      padding: 16rpx 0;
+      font-size: $font-size-sm;
+      color: $color-text-secondary;
+      text-align: center;
+      border-bottom: 4rpx solid transparent;
+      transition:
+        color 0.2s ease,
+        border-color 0.2s ease;
+
+      &--active {
+        font-weight: $font-weight-medium;
+        color: $color-primary;
+        border-bottom-color: $color-primary;
+      }
+    }
+
     &__panel {
       flex-shrink: 0;
       max-height: 50vh;
@@ -682,6 +854,10 @@
       background: $color-bg-page;
       border-top-left-radius: $radius-lg;
       border-top-right-radius: $radius-lg;
+    }
+
+    &__section {
+      padding: 0;
     }
 
     &__rider {
