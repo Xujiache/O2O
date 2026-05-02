@@ -16,7 +16,7 @@ scrape_configs:
     kubernetes_sd_configs:
       - role: pod
         namespaces:
-          names: ['o2o']
+          names: ['o2o', 'o2o-staging', 'o2o-production']
     pipeline_stages:
       # 解析 JSON 日志
       - json:

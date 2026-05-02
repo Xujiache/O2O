@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: o2o
+data:
+  mysql-backup.sh: |
+    #!/bin/bash
+    exec /scripts/mysql-backup.sh
+  redis-backup.sh: |
+    #!/bin/sh
+    exec /scripts/redis-backup.sh

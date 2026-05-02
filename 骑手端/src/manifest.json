@@ -10,6 +10,17 @@
     "router": {
       "mode": "history",
       "base": "./"
+    },
+    "title": "O2O 骑手端",
+    "publicPath": "./",
+    "devServer": {
+      "port": 5175,
+      "proxy": {
+        "/api": {
+          "target": "http://localhost:3000",
+          "changeOrigin": true
+        }
+      }
     }
   },
   "app-plus": {

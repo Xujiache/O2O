@@ -1,13 +1,181 @@
-# ============================================================================
-# K8s CronJob — MySQL 定时备份
-# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: o2o
+data:
+  mysql-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    cat <<'EOF' >/tmp/mysql-backup.sh
+    #!/bin/bash
+    # ============================================================================
+    # MySQL 备份脚本（每日全量 + binlog 增量）
+    # Cron: 0 2 * * * /opt/backup/mysql-backup.sh
+    # ============================================================================
+    set -euo pipefail
+
+    DATE=$(date +%Y%m%d_%H%M)
+    BACKUP_DIR="${BACKUP_DIR:-/backup/mysql}"
+    S3_BUCKET="${BACKUP_S3_BUCKET:-s3://o2o-backup/mysql}"
+    RETENTION_DAYS="${RETENTION_DAYS:-30}"
+    DB_HOST="${DB_HOST:-127.0.0.1}"
+    DB_PORT="${DB_PORT:-3306}"
+    DB_USER="${DB_USER:-root}"
+    DB_PASS="${DB_PASS:-}"
+    MYSQLDUMP_EXTRA_OPTS="${MYSQLDUMP_EXTRA_OPTS:-}"
+
+    BACKUP_FILE="${BACKUP_DIR}/full_${DATE}.sql"
+    BACKUP_ARCHIVE="${BACKUP_FILE}.gz"
+
+    mysql_cmd=(mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}")
+    mysqldump_cmd=(mysqldump -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}")
+    if [ -n "${DB_PASS}" ]; then
+      mysql_cmd+=("-p${DB_PASS}")
+      mysqldump_cmd+=("-p${DB_PASS}")
+    fi
+
+    cleanup_on_error() {
+      rm -f "${BACKUP_FILE}" "${BACKUP_ARCHIVE}"
+    }
+    trap cleanup_on_error ERR
+
+    echo "🔄 [${DATE}] 开始 MySQL 备份..."
+    mkdir -p "${BACKUP_DIR}"
+
+    "${mysql_cmd[@]}" -e 'SELECT 1' >/dev/null
+
+    # 全量备份（使用 mysqldump，生产环境建议替换为 xtrabackup）
+    # shellcheck disable=SC2206
+    extra_opts=( ${MYSQLDUMP_EXTRA_OPTS} )
+    "${mysqldump_cmd[@]}" \
+      --single-transaction --quick --routines --triggers --events \
+      --set-gtid-purged=OFF \
+      "${extra_opts[@]}" \
+      --all-databases > "${BACKUP_FILE}"
+
+    gzip -f "${BACKUP_FILE}"
+    size=$(du -sh "${BACKUP_ARCHIVE}" | cut -f1)
+    echo "✅ 备份完成: $(basename "${BACKUP_ARCHIVE}") (${size})"
+
+    # 上传异地
+    if command -v aws >/dev/null 2>&1; then
+      aws s3 cp "${BACKUP_ARCHIVE}" "${S3_BUCKET}/" --only-show-errors
+      echo "☁️ 已上传至 ${S3_BUCKET}"
+    else
+      echo "ℹ️ 未安装 aws CLI，跳过异地上传"
+    fi
+
+    # 清理旧备份
+    removed_count=$(find "${BACKUP_DIR}" -name "*.sql.gz" -mtime +"${RETENTION_DAYS}" -print | wc -l | tr -d ' ')
+    if [ "${removed_count}" -gt 0 ]; then
+      find "${BACKUP_DIR}" -name "*.sql.gz" -mtime +"${RETENTION_DAYS}" -delete
+    fi
+    echo "🧹 已按 ${RETENTION_DAYS} 天保留策略完成清理（删除 ${removed_count} 个旧备份）"
+
+    echo "✅ [$(date +%Y%m%d_%H%M)] MySQL 备份全部完成"
+    EOF
+    chmod 0755 /tmp/mysql-backup.sh
+    exec /bin/bash /tmp/mysql-backup.sh
+  redis-backup.sh: |
+    #!/bin/sh
+    set -eu
+    cat <<'EOF' >/tmp/redis-backup.sh
+    #!/bin/sh
+    # ============================================================================
+    # Redis 备份脚本
+    # Cron: 0 */6 * * * /opt/backup/redis-backup.sh
+    # ============================================================================
+    set -eu
+
+    DATE=$(date +%Y%m%d_%H%M)
+    BACKUP_DIR="${BACKUP_DIR:-/backup/redis}"
+    S3_BUCKET="${BACKUP_S3_BUCKET:-s3://o2o-backup/redis}"
+    RETENTION_DAYS="${RETENTION_DAYS:-7}"
+    REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
+    REDIS_PORT="${REDIS_PORT:-6379}"
+    REDIS_PASS="${REDIS_PASS:-${REDIS_PASSWORD:-}}"
+    REDIS_DATA_DIR="${REDIS_DATA_DIR:-/var/lib/redis}"
+    BGSAVE_TIMEOUT_SECONDS="${BGSAVE_TIMEOUT_SECONDS:-60}"
+    BACKUP_FILE="${BACKUP_DIR}/dump_${DATE}.rdb"
+    BACKUP_ARCHIVE="${BACKUP_FILE}.gz"
+    cleanup_required=1
+
+    cleanup_on_exit() {
+      if [ "${cleanup_required}" = "1" ]; then
+        rm -f "${BACKUP_FILE}" "${BACKUP_ARCHIVE}"
+      fi
+    }
+    trap cleanup_on_exit EXIT INT TERM
+
+    echo "🔄 [${DATE}] 开始 Redis 备份..."
+    mkdir -p "${BACKUP_DIR}"
+
+    if [ -n "${REDIS_PASS}" ]; then
+      export REDISCLI_AUTH="${REDIS_PASS}"
+    fi
+
+    redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" --no-auth-warning ping >/dev/null
+
+    # 若已有后台保存任务则等待完成，避免 BGSAVE 冲突
+    save_status=$(redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" --no-auth-warning INFO persistence | tr -d '\r' | grep '^rdb_bgsave_in_progress:' | cut -d: -f2 || true)
+    if [ "${save_status:-0}" = "1" ]; then
+      echo "ℹ️ 检测到已有 BGSAVE 任务，等待其完成..."
+    else
+      redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" --no-auth-warning BGSAVE >/dev/null
+    fi
+
+    start_ts=$(date +%s)
+    while true; do
+      save_status=$(redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" --no-auth-warning INFO persistence | tr -d '\r' | grep '^rdb_bgsave_in_progress:' | cut -d: -f2 || true)
+      if [ "${save_status:-0}" = "0" ]; then
+        break
+      fi
+      now_ts=$(date +%s)
+      if [ $((now_ts - start_ts)) -ge "${BGSAVE_TIMEOUT_SECONDS}" ]; then
+        echo "❌ Redis BGSAVE 超时 (${BGSAVE_TIMEOUT_SECONDS}s)"
+        exit 1
+      fi
+      sleep 1
+    done
+
+    src_dump="${REDIS_DATA_DIR}/dump.rdb"
+    if [ -f "${src_dump}" ]; then
+      cp "${src_dump}" "${BACKUP_FILE}"
+    else
+      redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" --no-auth-warning --rdb "${BACKUP_FILE}" >/dev/null
+    fi
+
+    gzip -f "${BACKUP_FILE}"
+    echo "✅ Redis 备份: $(basename "${BACKUP_ARCHIVE}")"
+
+    # 上传
+    if command -v aws >/dev/null 2>&1; then
+      aws s3 cp "${BACKUP_ARCHIVE}" "${S3_BUCKET}/" --only-show-errors
+      echo "☁️ 已上传至 ${S3_BUCKET}"
+    else
+      echo "ℹ️ 未安装 aws CLI，跳过异地上传"
+    fi
+
+    # 清理旧备份
+    removed_count=$(find "${BACKUP_DIR}" -name "*.rdb.gz" -mtime +"${RETENTION_DAYS}" -print | wc -l | tr -d ' ')
+    if [ "${removed_count}" -gt 0 ]; then
+      find "${BACKUP_DIR}" -name "*.rdb.gz" -mtime +"${RETENTION_DAYS}" -delete
+    fi
+    echo "🧹 已按 ${RETENTION_DAYS} 天保留策略完成清理（删除 ${removed_count} 个旧备份）"
+    cleanup_required=0
+    echo "✅ [$(date +%Y%m%d_%H%M)] Redis 备份完成"
+    EOF
+    chmod 0755 /tmp/redis-backup.sh
+    exec /bin/sh /tmp/redis-backup.sh
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: mysql-backup
   namespace: o2o
 spec:
-  schedule: "0 2 * * *"   # 每日 02:00
+  schedule: '0 2 * * *'
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
@@ -20,19 +188,75 @@ spec:
           containers:
             - name: mysql-backup
               image: mysql:8.0
-              command: ["/bin/bash", "/scripts/mysql-backup.sh"]
+              imagePullPolicy: IfNotPresent
+              command: ['/bin/bash', '/config/mysql-backup.sh']
+              env:
+                - name: BACKUP_DIR
+                  value: /backup/mysql
+                - name: RETENTION_DAYS
+                  value: '30'
               envFrom:
+                - configMapRef:
+                    name: backend-config
                 - secretRef:
                     name: backend-secret
               volumeMounts:
-                - name: scripts
-                  mountPath: /scripts
+                - name: backup-scripts
+                  mountPath: /config
                 - name: backup-storage
                   mountPath: /backup
           volumes:
-            - name: scripts
+            - name: backup-scripts
               configMap:
                 name: backup-scripts
+                defaultMode: 0755
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: backup-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-backup
+  namespace: o2o
+spec:
+  schedule: '0 */6 * * *'
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: redis-backup
+              image: redis:7-alpine
+              imagePullPolicy: IfNotPresent
+              command: ['/bin/sh', '/config/redis-backup.sh']
+              env:
+                - name: BACKUP_DIR
+                  value: /backup/redis
+                - name: RETENTION_DAYS
+                  value: '7'
+                - name: REDIS_DATA_DIR
+                  value: /data
+              envFrom:
+                - configMapRef:
+                    name: backend-config
+                - secretRef:
+                    name: backend-secret
+              volumeMounts:
+                - name: backup-scripts
+                  mountPath: /config
+                - name: backup-storage
+                  mountPath: /backup
+          volumes:
+            - name: backup-scripts
+              configMap:
+                name: backup-scripts
+                defaultMode: 0755
             - name: backup-storage
               persistentVolumeClaim:
                 claimName: backup-pvc

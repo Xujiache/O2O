@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-exporter
+  namespace: o2o
+  labels:
+    app: mysql-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-exporter
+  template:
+    metadata:
+      labels:
+        app: mysql-exporter
+    spec:
+      containers:
+        - name: mysql-exporter
+          image: prom/mysqld-exporter:v0.16.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 9104
+          env:
+            - name: DATA_SOURCE_NAME
+              value: '$(DB_USER):$(DB_PASS)@(mysql:3306)/'
+          envFrom:
+            - secretRef:
+                name: backend-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-exporter
+  namespace: o2o
+spec:
+  selector:
+    app: mysql-exporter
+  ports:
+    - name: metrics
+      port: 9104
+      targetPort: metrics

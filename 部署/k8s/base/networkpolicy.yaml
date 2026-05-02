@@ -24,28 +24,44 @@ spec:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 3000
+          protocol: TCP
   egress:
-    # 允许访问 MySQL
+    # 允许访问同命名空间内依赖服务
     - to:
         - podSelector:
             matchLabels:
               app: mysql
       ports:
         - port: 3306
-    # 允许访问 Redis
+          protocol: TCP
     - to:
         - podSelector:
             matchLabels:
               app: redis
       ports:
         - port: 6379
-    # 允许访问 RabbitMQ
+          protocol: TCP
     - to:
         - podSelector:
             matchLabels:
               app: rabbitmq
       ports:
         - port: 5672
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - port: 9000
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: timescaledb
+      ports:
+        - port: 5432
+          protocol: TCP
     # 允许 DNS 解析
     - to: []
       ports:
@@ -57,3 +73,4 @@ spec:
     - to: []
       ports:
         - port: 443
+          protocol: TCP

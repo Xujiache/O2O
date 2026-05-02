@@ -7,16 +7,22 @@ metadata:
   name: backend-config
   namespace: {{ .Release.Namespace }}
 data:
-  NODE_ENV: "production"
-  APP_PORT: "{{ .Values.backend.port }}"
-  APP_PREFIX: "/api/v1"
-  DB_HOST: "{{ .Values.mysql.host }}"
-  DB_PORT: "{{ .Values.mysql.port }}"
-  DB_NAME: "{{ .Values.mysql.database }}"
+  NODE_ENV: {{ .Values.env.nodeEnv | quote }}
+  APP_PORT: {{ .Values.backend.port | quote }}
+  APP_PREFIX: {{ .Values.env.appPrefix | quote }}
+  DB_HOST: {{ .Values.mysql.host | quote }}
+  DB_PORT: {{ .Values.mysql.port | quote }}
+  DB_NAME: {{ .Values.mysql.database | quote }}
   DB_SYNCHRONIZE: "false"
   DB_LOGGING: "false"
-  REDIS_HOST: "{{ .Values.redis.host }}"
-  REDIS_PORT: "{{ .Values.redis.port }}"
-  MINIO_ENDPOINT: "{{ .Values.minio.endpoint }}"
-  MINIO_PORT: "{{ .Values.minio.port }}"
-  MINIO_BUCKET: "{{ .Values.minio.bucket }}"
+  REDIS_HOST: {{ .Values.redis.host | quote }}
+  REDIS_PORT: {{ .Values.redis.port | quote }}
+  RABBITMQ_QUEUE_PREFIX: {{ .Values.env.rabbitmqQueuePrefix | quote }}
+  MINIO_ENDPOINT: {{ .Values.minio.endpoint | quote }}
+  MINIO_PORT: {{ .Values.minio.port | quote }}
+  MINIO_USE_SSL: {{ .Values.env.minioUseSSL | quote }}
+  MINIO_BUCKET: {{ .Values.minio.bucket | quote }}
+  TIMESCALE_HOST: {{ .Values.timescale.host | quote }}
+  TIMESCALE_PORT: {{ .Values.timescale.port | quote }}
+  TIMESCALE_DB: {{ .Values.timescale.database | quote }}
+  AMAP_BASE_URL: {{ .Values.env.amapBaseUrl | quote }}

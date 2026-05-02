@@ -1,12 +1,46 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#00C853" />
+    <meta name="description" content="O2O 外卖+跑腿一体化平台 - 骑手端" />
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         document.documentElement.style.fontSize = document.documentElement.clientWidth / 20 + 'px'
       })
+      window.addEventListener('resize', function () {
+        document.documentElement.style.fontSize = document.documentElement.clientWidth / 20 + 'px'
+      })
     </script>
+    <style>
+      /* 移动端全局基础样式 */
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        width: 100%;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      input,
+      textarea,
+      select {
+        -webkit-appearance: none;
+        appearance: none;
+      }
+    </style>
     <title>O2O 骑手端</title>
     <!--preload-links-->
     <!--app-context-->

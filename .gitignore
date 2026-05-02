@@ -88,6 +88,13 @@ src/types/import/components.d.ts
 部署/docker-data/
 部署/**/data/
 
+# Redis 持久化快照（本地 redis-cli SAVE 产物，不入库）
+dump.rdb
+*.rdb
+
+# Claude Code session 数据（每次会话/工作区变化，不应入库）
+.claude/
+
 # IDE 自动产物（sessionId 每次重启变化，不应入库）
 .cursor/mcp.json
 # IDE 插件自动生成的 rule（如 my-mcp，每次启用后会自动写入）

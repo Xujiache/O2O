@@ -10,6 +10,17 @@
     "router": {
       "mode": "history",
       "base": "./"
+    },
+    "title": "O2O 用户端",
+    "publicPath": "./",
+    "devServer": {
+      "port": 5173,
+      "proxy": {
+        "/api": {
+          "target": "http://localhost:3000",
+          "changeOrigin": true
+        }
+      }
     }
   },
   "mp-weixin": {

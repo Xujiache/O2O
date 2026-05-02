@@ -8,9 +8,10 @@ metadata:
   name: o2o
   namespace: {{ .Release.Namespace }}
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.issuer }}
+{{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | quote }}
+{{- end }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.issuer | quote }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:

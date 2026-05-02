@@ -18,15 +18,17 @@ backend:
       cpu: 500m
       memory: 512Mi
     limits:
-      cpu: "2"
+      cpu: '2'
       memory: 2Gi
   hpa:
     enabled: true
     minReplicas: 2
     maxReplicas: 20
     targetCPU: 70
+    targetMemory: 80
 
 adminWeb:
+  port: 80
   resources:
     requests:
       cpu: 100m
@@ -38,6 +40,12 @@ adminWeb:
 ingress:
   enabled: true
   className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/proxy-body-size: '50m'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '120'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '120'
+    nginx.ingress.kubernetes.io/limit-rps: '60'
   hosts:
     api: api.o2o.com
     admin: admin.o2o.com
@@ -45,23 +53,35 @@ ingress:
     secretName: o2o-tls
     issuer: letsencrypt-prod
 
+env:
+  nodeEnv: production
+  appPrefix: /api/v1
+  rabbitmqQueuePrefix: o2o
+  minioUseSSL: false
+  amapBaseUrl: https://restapi.amap.com
+
 mysql:
-  host: mysql.o2o.svc.cluster.local
+  host: mysql
   port: 3306
   database: o2o_platform
 
 redis:
-  host: redis.o2o.svc.cluster.local
+  host: redis
   port: 6379
 
 rabbitmq:
-  host: rabbitmq.o2o.svc.cluster.local
+  host: rabbitmq
   port: 5672
 
 minio:
-  endpoint: minio.o2o.svc.cluster.local
+  endpoint: minio
   port: 9000
   bucket: o2o-files
+
+timescale:
+  host: timescaledb
+  port: 5432
+  database: o2o_timescale
 
 monitoring:
   enabled: true

@@ -30,3 +30,6 @@ O2O外卖+跑腿一体化平台 需求规格说明书.md
 docs/**
 管理后台/CHANGELOG.md
 管理后台/CHANGELOG.zh-CN.md
+
+# Helm 模板含 Go template 语法 {{ .Values.x }}，prettier 无法识别为合法 YAML
+部署/helm/o2o/templates/**

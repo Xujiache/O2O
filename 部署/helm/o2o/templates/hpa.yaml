@@ -21,4 +21,10 @@ spec:
         target:
           type: Utilization
           averageUtilization: {{ .Values.backend.hpa.targetCPU }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.backend.hpa.targetMemory }}
 {{- end }}

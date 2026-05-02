@@ -4,22 +4,22 @@ metadata:
   name: backend-config
   namespace: o2o
 data:
-  NODE_ENV: "production"
-  APP_PORT: "3000"
-  APP_PREFIX: "/api/v1"
-  DB_HOST: "mysql.o2o.svc.cluster.local"
-  DB_PORT: "3306"
-  DB_NAME: "o2o_platform"
-  DB_SYNCHRONIZE: "false"
-  DB_LOGGING: "false"
-  REDIS_HOST: "redis.o2o.svc.cluster.local"
-  REDIS_PORT: "6379"
-  RABBITMQ_QUEUE_PREFIX: "o2o"
-  MINIO_ENDPOINT: "minio.o2o.svc.cluster.local"
-  MINIO_PORT: "9000"
-  MINIO_USE_SSL: "false"
-  MINIO_BUCKET: "o2o-files"
-  TIMESCALE_HOST: "timescaledb.o2o.svc.cluster.local"
-  TIMESCALE_PORT: "5432"
-  TIMESCALE_DB: "o2o_timescale"
-  AMAP_BASE_URL: "https://restapi.amap.com"
+  NODE_ENV: 'production'
+  APP_PORT: '3000'
+  APP_PREFIX: '/api/v1'
+  DB_HOST: 'mysql'
+  DB_PORT: '3306'
+  DB_NAME: 'o2o_platform'
+  DB_SYNCHRONIZE: 'false'
+  DB_LOGGING: 'false'
+  REDIS_HOST: 'redis'
+  REDIS_PORT: '6379'
+  RABBITMQ_QUEUE_PREFIX: 'o2o'
+  MINIO_ENDPOINT: 'minio'
+  MINIO_PORT: '9000'
+  MINIO_USE_SSL: 'false'
+  MINIO_BUCKET: 'o2o-files'
+  TIMESCALE_HOST: 'timescaledb'
+  TIMESCALE_PORT: '5432'
+  TIMESCALE_DB: 'o2o_timescale'
+  AMAP_BASE_URL: 'https://restapi.amap.com'

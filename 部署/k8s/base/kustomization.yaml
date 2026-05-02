@@ -12,3 +12,6 @@ resources:
   - secret.yaml
   - pdb.yaml
   - networkpolicy.yaml
+  - mysql-exporter.yaml
+  - redis-exporter.yaml
+  - node-exporter.yaml

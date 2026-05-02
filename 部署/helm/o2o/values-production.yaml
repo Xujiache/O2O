@@ -9,13 +9,14 @@ backend:
       cpu: 500m
       memory: 512Mi
     limits:
-      cpu: "2"
+      cpu: '2'
       memory: 2Gi
   hpa:
     enabled: true
     minReplicas: 2
     maxReplicas: 20
     targetCPU: 70
+    targetMemory: 80
 
 ingress:
   hosts:
