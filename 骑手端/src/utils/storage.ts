@@ -44,7 +44,13 @@ export const STORAGE_KEYS = {
   /** 取件码错误次数（防爆破） */
   PICKUP_ERROR_COUNT: 'o2o_rider_pickup_error_count',
   /** 骑手登录后辅助状态：保证金已交标记 + 健康证有效期 */
-  AUTH_EXTRA: 'o2o_rider_auth_extra'
+  AUTH_EXTRA: 'o2o_rider_auth_extra',
+  /**
+   * pinia-plugin-persistedstate 的 auth store 持久化 key
+   * P9 Sprint 7 W7.C.3：统一抽常量，原硬编码字符串收敛至此
+   * 值保持不变以兼容已安装用户 localStorage 中的既有数据
+   */
+  AUTH_PERSIST: 'o2o_rider_auth'
 } as const
 
 interface StorageEntry<T> {

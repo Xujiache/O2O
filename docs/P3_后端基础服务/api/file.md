@@ -6,7 +6,7 @@
 ## 0. 通用约定
 
 - 路径前缀：`/api/v1/file`（在 `main.ts setGlobalPrefix` 中统一）
-- 鉴权：`Authorization: Bearer <jwt>`（已接入 A 的 `JwtAuthGuard` + `UserTypeGuard`，4 端登录均可上传/查询/删除；R1/I-02 后旧 X-Uploader-* 头部兜底已废弃）
+- 鉴权：`Authorization: Bearer <jwt>`（已接入 A 的 `JwtAuthGuard` + `UserTypeGuard`，4 端登录均可上传/查询/删除；uploaderType / uploaderId 由 JWT 解析后注入到 `UploadContext`，无需任何自定义请求头）
 - 响应：`{ code: 0, message: 'ok', data: ..., traceId, timestamp }`（由 `TransformInterceptor` 包裹）
 - 错误：`{ code, message, data: null, httpStatus, path, timestamp }`（由 `AllExceptionsFilter` 统一）
 - Swagger 分组：用户端 / 商户端 / 骑手端 / 管理后台 / 内部 5 组都包含 File 模块
@@ -216,7 +216,7 @@ await fetch(url, {
 启动依赖：`pnpm docker:dev:up` 拉起 MinIO / Redis / TimescaleDB。
 
 ```bash
-# ===== R1 后：所有接口必须带 Authorization Bearer，X-Uploader-* 头部已废弃 =====
+# ===== 所有接口必须带 Authorization Bearer；uploaderType / uploaderId 一律从 JWT 解析 =====
 TOKEN="eyJhbGciOiJIUzUxMiJ9..."  # POST /auth/admin/login 拿到
 
 # 上传

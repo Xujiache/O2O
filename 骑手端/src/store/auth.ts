@@ -176,7 +176,7 @@ export const useAuthStore = defineStore(
       removeStorage(STORAGE_KEYS.AUTH_EXTRA)
       removeStorage(STORAGE_KEYS.JPUSH_REG_ID)
       try {
-        uni.removeStorageSync('o2o_rider_auth')
+        uni.removeStorageSync(STORAGE_KEYS.AUTH_PERSIST)
       } catch {
         /* 忽略 */
       }
@@ -196,7 +196,7 @@ export const useAuthStore = defineStore(
       healthCertExpireAt.value = null
       onDuty.value = false
       try {
-        uni.removeStorageSync('o2o_rider_auth')
+        uni.removeStorageSync(STORAGE_KEYS.AUTH_PERSIST)
       } catch {
         /* 忽略 */
       }
@@ -227,7 +227,7 @@ export const useAuthStore = defineStore(
   },
   {
     persist: {
-      key: 'o2o_rider_auth',
+      key: STORAGE_KEYS.AUTH_PERSIST,
       storage: {
         getItem: (k: string) => uni.getStorageSync(k) as string,
         setItem: (k: string, v: string) => uni.setStorageSync(k, v)

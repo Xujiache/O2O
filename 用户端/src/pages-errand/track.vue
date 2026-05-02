@@ -367,7 +367,7 @@
   onShow(() => {
     /* 从后台返回时补齐一次最新状态 */
     if (orderNo.value && orderDetail.value) {
-      void refreshOrder()
+      void loadProofs()
     }
   })
 
@@ -377,7 +377,7 @@
   })
 
   onHide(() => {
-    /* 后台时停止插值与倒计时，节省资源；onShow 时由 refreshOrder 重新触发 */
+    /* 后台时停止插值与倒计时，节省资源；onShow 时由 loadProofs 重新触发 */
     stopInterpolation()
     stopCountdown()
   })
@@ -391,7 +391,7 @@
   async function initialize() {
     mapReady.value = false
     try {
-      await refreshOrder()
+      await loadProofs()
       const d = orderDetail.value
       if (!d) return
       mapReady.value = true
@@ -404,8 +404,11 @@
     }
   }
 
-  /** 拉取订单详情 + 同步本地状态 */
-  async function refreshOrder() {
+  /**
+   * 拉取订单详情 + 同步本地状态（含取件/送达点、骑手、取件码、凭证图、ETA、地图居中）
+   * P9 Sprint 7 W7.C.1：函数名统一为 loadProofs
+   */
+  async function loadProofs() {
     try {
       const d = (await getOrderDetail(orderNo.value)) as OrderErrand
       orderDetail.value = d
@@ -441,7 +444,7 @@
       computeRemainingSec(d.estimatedArrivalAt ?? null)
       centerMap()
     } catch (e) {
-      logger.warn('errand.track.refreshOrder.fail', { e: String(e) })
+      logger.warn('errand.track.loadProofs.fail', { e: String(e) })
     }
   }
 
@@ -512,7 +515,7 @@
         }
       }
       /* 状态变更触发一次详情刷新（拿可能新增的 riderId / pickupCode） */
-      void refreshOrder()
+      void loadProofs()
     })
   }
 
@@ -603,7 +606,7 @@
         track(TRACK.WS_RECONNECT, { orderNo: orderNo.value })
       }
       /* WS 通畅与否，都拉一次详情（保底状态/取件码同步） */
-      void refreshOrder()
+      void loadProofs()
     }, POLL_INTERVAL_MS)
   }
 

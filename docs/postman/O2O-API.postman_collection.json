@@ -1,0 +1,269 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "name": "O2O 跑腿+外卖 API",
+    "description": "O2O 跑腿+外卖 后端 API 集合（P9 Sprint 7 / W7.B.4）。\n\n## 使用方式\n\n1. 导入本 collection 到 Postman / Apifox\n2. 在 collection variables 里设置 `baseUrl` / `username` / `password`（默认 dev = `http://localhost:3000/api/v1` + `admin` / `Pwd@2026`）\n3. 直接发送任意一个 protected 请求 —— Pre-request Script 会自动登录拿 JWT 并写入 `{{jwt}}`\n4. 后续请求自动复用该 token；token 失效（401）时下一次发送会再自动刷新\n\n## 环境切换\n\n- dev: `http://localhost:3000/api/v1`\n- staging: `https://api-staging.o2o.example.com/api/v1`\n- prod: `https://api.o2o.example.com/api/v1`\n\n建议为每套环境创建独立的 Postman Environment 覆盖 `baseUrl` / `username` / `password`。\n\n## Pre-request Script\n\n位于 collection 根级，每次发送请求前执行：若 `{{jwt}}` 不存在或已过期，则调用 `POST {{baseUrl}}/auth/admin/login` 获取新 token 并写回 collection variable。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "p9-sprint7-agent-b"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string",
+      "description": "后端 API 基础路径（含 /api/v1 前缀）"
+    },
+    {
+      "key": "username",
+      "value": "admin",
+      "type": "string",
+      "description": "管理员账号（仅 dev 演示用；prod 切换至专用账号）"
+    },
+    {
+      "key": "password",
+      "value": "Pwd@2026",
+      "type": "string",
+      "description": "管理员密码（仅 dev 演示用；勿提交真密码）"
+    },
+    {
+      "key": "jwt",
+      "value": "",
+      "type": "string",
+      "description": "由 Pre-request Script 自动注入的 access token；手动留空"
+    },
+    {
+      "key": "jwtExpiresAt",
+      "value": "0",
+      "type": "string",
+      "description": "由 Pre-request Script 写入的 token 失效时间戳（毫秒）；用于过期主动刷新"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "id": "auto-login-pre-request",
+        "type": "text/javascript",
+        "exec": [
+          "/**",
+          " * 自动登录 Pre-request Script（collection 级）",
+          " * 工作原理：",
+          " *   1. 当前请求若 path 命中 /auth/admin/login（即登录接口本身）→ 跳过，避免循环",
+          " *   2. 读 {{jwt}} 与 {{jwtExpiresAt}}：仍有效 → 直接走 collection-level Bearer Auth",
+          " *   3. 否则调用 POST {{baseUrl}}/auth/admin/login 拿 accessToken + expiresIn → 写入 collection variable",
+          " *   4. 失败时 console.error 但不阻塞当前请求（让它自然 401，便于排查）",
+          " */",
+          "const url = pm.request.url.toString()",
+          "if (url.includes('/auth/admin/login')) {",
+          "  /* 登录接口自身：跳过 */",
+          "  return",
+          "}",
+          "",
+          "const jwt = pm.collectionVariables.get('jwt')",
+          "const expiresAt = parseInt(pm.collectionVariables.get('jwtExpiresAt') || '0', 10)",
+          "const now = Date.now()",
+          "/* 提前 60s 刷新，避免边界过期 */",
+          "if (jwt && expiresAt > now + 60 * 1000) {",
+          "  return",
+          "}",
+          "",
+          "const baseUrl = pm.collectionVariables.get('baseUrl')",
+          "const username = pm.collectionVariables.get('username')",
+          "const password = pm.collectionVariables.get('password')",
+          "",
+          "pm.sendRequest({",
+          "  url: baseUrl + '/auth/admin/login',",
+          "  method: 'POST',",
+          "  header: { 'Content-Type': 'application/json' },",
+          "  body: { mode: 'raw', raw: JSON.stringify({ username: username, password: password }) }",
+          "}, function (err, res) {",
+          "  if (err) {",
+          "    console.error('[O2O Pre-request] login failed:', err)",
+          "    return",
+          "  }",
+          "  try {",
+          "    const body = res.json()",
+          "    /* 后端响应被 TransformInterceptor 包裹为 { code, data: { tokens: { accessToken, expiresIn } } } */",
+          "    const tokens = (body && body.data && body.data.tokens) || (body && body.data) || {}",
+          "    const accessToken = tokens.accessToken",
+          "    const expiresIn = parseInt(tokens.expiresIn || '7200', 10)",
+          "    if (!accessToken) {",
+          "      console.error('[O2O Pre-request] no accessToken in login response:', body)",
+          "      return",
+          "    }",
+          "    pm.collectionVariables.set('jwt', accessToken)",
+          "    pm.collectionVariables.set('jwtExpiresAt', String(Date.now() + expiresIn * 1000))",
+          "    console.log('[O2O Pre-request] jwt refreshed, expires in', expiresIn, 's')",
+          "  } catch (e) {",
+          "    console.error('[O2O Pre-request] parse login response failed:', e)",
+          "  }",
+          "})"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "id": "global-status-check",
+        "type": "text/javascript",
+        "exec": [
+          "/* 全局响应基础校验：HTTP 2xx 且 body 含 code 字段 */",
+          "pm.test('Status code is 2xx', function () {",
+          "  pm.expect(pm.response.code).to.be.within(200, 299)",
+          "})",
+          "pm.test('Body has code field', function () {",
+          "  const body = pm.response.json()",
+          "  pm.expect(body).to.have.property('code')",
+          "})"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth - Admin Login（登录拿 JWT）",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+        "url": {
+          "raw": "{{baseUrl}}/auth/admin/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "admin", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "description": "管理员账密登录。返回 `{ tokens: { accessToken, refreshToken, expiresIn }, menus, permissions, admin }`。\n\n本请求是 Pre-request Script 内部调用的端点，本身不参与 Pre-request 自动登录流程（避免死循环）。\n\n响应 200 + `code:0`。401 表示账密错误。"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login returns accessToken', function () {",
+              "  const body = pm.response.json()",
+              "  const tokens = (body.data && body.data.tokens) || body.data",
+              "  pm.expect(tokens).to.have.property('accessToken')",
+              "  /* 同步写到 collection variable，供后续手动调试 */",
+              "  if (tokens.accessToken) {",
+              "    pm.collectionVariables.set('jwt', tokens.accessToken)",
+              "    const exp = parseInt(tokens.expiresIn || '7200', 10)",
+              "    pm.collectionVariables.set('jwtExpiresAt', String(Date.now() + exp * 1000))",
+              "  }",
+              "})"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User - Get Me（当前用户）",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["me"]
+        },
+        "description": "获取当前登录用户的 profile。\n\n鉴权：collection-level Bearer `{{jwt}}` 由 Pre-request Script 注入。"
+      }
+    },
+    {
+      "name": "Order - User Order List（订单列表）",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/user/orders?page=1&pageSize=20&status=",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "orders"],
+          "query": [
+            { "key": "page", "value": "1" },
+            { "key": "pageSize", "value": "20" },
+            { "key": "status", "value": "", "description": "可选：created/paid/dispatched/...（留空 = 全部）" }
+          ]
+        },
+        "description": "拉取当前用户的订单列表（分页）。"
+      }
+    },
+    {
+      "name": "Shop - Public Shop List（店铺列表）",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/shops?page=1&pageSize=20&keyword=",
+          "host": ["{{baseUrl}}"],
+          "path": ["shops"],
+          "query": [
+            { "key": "page", "value": "1" },
+            { "key": "pageSize", "value": "20" },
+            { "key": "keyword", "value": "", "description": "可选：店铺名 / 品类 关键词" }
+          ]
+        },
+        "description": "公开店铺列表（@Public，无需登录）。"
+      }
+    },
+    {
+      "name": "File - Upload（文件上传）",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/file/upload",
+          "host": ["{{baseUrl}}"],
+          "path": ["file", "upload"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": [],
+              "description": "二进制文件（图片 ≤20MB、视频 ≤100MB、PDF ≤10MB）"
+            },
+            {
+              "key": "bizModule",
+              "value": "avatar",
+              "type": "text",
+              "description": "avatar / qual / proof / invoice / banner / product / shop / video / temp / other"
+            },
+            {
+              "key": "isPublic",
+              "value": "true",
+              "type": "text",
+              "description": "true → o2o-public（CDN URL）；false → o2o-private（15min 签名 URL）"
+            },
+            {
+              "key": "watermark",
+              "value": "false",
+              "type": "text",
+              "description": "true 仅图片右下角加文字水印；身份证/资质类必须 false"
+            }
+          ]
+        },
+        "description": "代理上传文件（multipart/form-data）。\n\n返回 `{ id, fileNo, bucket, objectKey, url, size, mimeType, isPublic }`。\n\n白名单：MIME / 扩展名 / 大小三层校验，任一不过抛 10001 PARAM_INVALID。"
+      }
+    }
+  ]
+}

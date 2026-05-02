@@ -92,13 +92,60 @@ export default ({ mode }: { mode: string }) => {
             // 不参与首屏 preload；与 vendor-wangeditor 拆分以减小首屏 bundle）
             // P9 Sprint 4 W4.D.4 优化
             if (id.includes('highlight.js')) return 'vendor-highlight-async'
-            // Element Plus 全家桶（含 icons / dayjs / @ctrl/tinycolor）
-            if (
-              id.includes('element-plus') ||
-              id.includes('@element-plus/icons-vue') ||
-              id.includes('@ctrl/tinycolor')
-            ) {
-              return 'vendor-element-plus'
+            // Element Plus 全家桶按子目录二级拆分（P9 Sprint 7 / W7.A.1）
+            // 决议：P9-S6-I01 vendor-element-plus 798KB → 按 components/ 子目录拆为 6 个 chunk
+            // 目标：每个 chunk ≤ 300KB；vendor-el-base + vendor-el-form 总和 ≤ 400KB
+            // 路径形态：node_modules/element-plus/es/components/{name}/...
+            if (id.includes('@element-plus/icons-vue')) {
+              return 'vendor-el-icons'
+            }
+            if (id.includes('element-plus')) {
+              // 表单·高级选择器（date-picker / time-picker 含日历 + color-picker 含色板 + cascader 含树面板，单独成 chunk）
+              if (
+                /element-plus\/(es|lib)\/components\/(date-picker|time-picker|time-select|color-picker|cascader)\b/.test(
+                  id
+                )
+              ) {
+                return 'vendor-el-pickers'
+              }
+              // 表单·基础（输入控件 + 校验）
+              if (
+                /element-plus\/(es|lib)\/components\/(form|form-item|input|input-number|select|select-v2|option|autocomplete|tree-select|radio|checkbox|switch|rate|slider|upload)\b/.test(
+                  id
+                )
+              ) {
+                return 'vendor-el-form'
+              }
+              // 表格类（数据表 + 分页 + 虚拟列表）
+              if (
+                /element-plus\/(es|lib)\/components\/(table|table-v2|table-column|pagination|virtual-list|tree|tree-v2)\b/.test(
+                  id
+                )
+              ) {
+                return 'vendor-el-table'
+              }
+              // 浮层类（弹窗 / 抽屉 / 提示）
+              if (
+                /element-plus\/(es|lib)\/components\/(dialog|drawer|message-box|message|notification|popover|popconfirm|tooltip|popper)\b/.test(
+                  id
+                )
+              ) {
+                return 'vendor-el-overlay'
+              }
+              // 展示类（卡片 / 折叠 / Tab / 时间线）
+              if (
+                /element-plus\/(es|lib)\/components\/(card|collapse|descriptions|tabs|steps|timeline|image|avatar|badge|tag|divider|skeleton|empty|result|carousel|backtop)\b/.test(
+                  id
+                )
+              ) {
+                return 'vendor-el-display'
+              }
+              // 兜底：基础（button / icon / link / scrollbar / loading / 共享 utils / hooks / locale）
+              return 'vendor-el-base'
+            }
+            // tinycolor 是 element-plus 配色依赖，独立小 chunk 走 utils
+            if (id.includes('@ctrl/tinycolor')) {
+              return 'vendor-el-base'
             }
             // Iconify
             if (id.includes('@iconify')) return 'vendor-iconify'

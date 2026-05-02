@@ -76,6 +76,7 @@
    */
   import { ref, computed } from 'vue'
   import { onLoad } from '@dcloudio/uni-app'
+  import currency from 'currency.js'
   import BizLoading from '@/components/biz/BizLoading.vue'
   import BizEmpty from '@/components/biz/BizEmpty.vue'
   import { listMyCoupons } from '@/api/coupon'
@@ -113,21 +114,23 @@
   }
 
   function isAvailable(uc: UserCoupon): boolean {
-    const min = Number(uc.coupon.minOrderAmount ?? 0)
-    return Number(total.value) >= min
+    const min = currency(uc.coupon.minOrderAmount ?? 0).value
+    return currency(total.value).value >= min
   }
 
   function amountText(uc: UserCoupon): string {
     const v = uc.coupon.discountValue
     if (uc.coupon.couponType === 2) {
-      const folds = (Number(v) / 10).toFixed(1)
+      /* 折扣券：discountValue 为折数 ×10（如 8.5 折 → 85），用 currency.js 大数除 10 + 1 位小数展示 */
+      const folds = currency(v).divide(10).value.toFixed(1)
       return `${folds}折`
     }
-    return `¥${v}`
+    /* 满减/立减券：直接用 currency.js 格式化为 ¥xx.xx */
+    return currency(v, { symbol: '¥', precision: 2 }).format()
   }
 
   function ruleText(uc: UserCoupon): string {
-    const min = Number(uc.coupon.minOrderAmount ?? 0)
+    const min = currency(uc.coupon.minOrderAmount ?? 0).value
     if (min <= 0) return '无门槛'
     return `满 ${formatAmount(uc.coupon.minOrderAmount)} 可用`
   }
